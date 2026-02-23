@@ -28,8 +28,8 @@
  *  effects?: {
  *    drops?: DropEntryTuple[],
  *    scoreboardAddsOnBreak?: Record<string, number>,
- *    xp?: { base:number, scalingObjective:string, gainObjective?:string, stepPerPoints?:number },
- *    title?: { enabled:boolean, source?:string, id?:string, priority?:number, durationTicks?:number, content?:string[] },
+	 *    xp?: { base:number, scalingObjective:string, gainObjective?:string, levelObjective?:string, stepPerPoints?:number },
+	 *    title?: { enabled:boolean, source?:string, id?:string, priority?:number, durationTicks?:number, content?:string[] },
  *  },
  * }} ModifierRule
  *
@@ -105,7 +105,22 @@ export const skillRegenConfig = {
 			source: "regen_xp",
 			priority: 40,
 			durationTicks: 40,
+			// Placeholders soportados:
+			// - ${xpGain}
+			// - ${xpActual}
+			// - ${xpRequeriment} (compat con el naming actual)
+			// - ${xpRequirement} (alias)
+			// - ${skill}
 			contentTemplate: ["+${xpGain}"],
+			// Provisional: requirement para siguiente nivel = (nivelActual + 1) * requirementPerLevel
+			provisional: {
+				requirementPerLevel: 50,
+			},
+			progressObjectivesBySkill: {
+				mining: { xp: "SkillXpMineria", level: "SkillLvlMineria" },
+				foraging: { xp: "SkillXpTala", level: "SkillLvlTala" },
+				farming: { xp: "SkillXpCosecha", level: "SkillLvlCosecha" },
+			},
 		},
 	},
 
@@ -216,6 +231,7 @@ export const skillRegenConfig = {
 							base: 8,
 							scalingObjective: "ExpMinTotalH",
 							gainObjective: "SkillXpMineria",
+							levelObjective: "SkillLvlMineria",
 							stepPerPoints: 10,
 						},
 						title: {
@@ -224,7 +240,7 @@ export const skillRegenConfig = {
 							id: "mining_xp_a",
 							priority: 40,
 							durationTicks: 40,
-							content: ["+${xpGain}"],
+							content: ["§3+${xpGain} ${xpActual}/${xpRequeriment}"],
 						},
 					},
 				},
@@ -246,6 +262,7 @@ export const skillRegenConfig = {
 							base: 12,
 							scalingObjective: "ExpMinTotalH",
 							gainObjective: "SkillXpMineria",
+							levelObjective: "SkillLvlMineria",
 							stepPerPoints: 10,
 						},
 						title: {
@@ -254,7 +271,7 @@ export const skillRegenConfig = {
 							id: "mining_xp_b",
 							priority: 41,
 							durationTicks: 40,
-							content: ["+${xpGain}"],
+							content: ["§3+${xpGain} ${xpActual}/${xpRequeriment}"],
 						},
 					},
 				},
@@ -297,6 +314,7 @@ export const skillRegenConfig = {
 							base: 6,
 							scalingObjective: "ExpTalTotalH",
 							gainObjective: "SkillXpTala",
+							levelObjective: "SkillLvlTala",
 							stepPerPoints: 10,
 						},
 						title: {
@@ -305,7 +323,7 @@ export const skillRegenConfig = {
 							id: "foraging_xp_a",
 							priority: 35,
 							durationTicks: 30,
-							content: ["+${xpGain}"],
+							content: ["§3+${xpGain}"],
 						},
 					},
 				},
@@ -347,6 +365,7 @@ export const skillRegenConfig = {
 							base: 4,
 							scalingObjective: "ExpCosTotalH",
 							gainObjective: "SkillXpCosecha",
+							levelObjective: "SkillLvlCosecha",
 							stepPerPoints: 10,
 						},
 						title: {
@@ -355,7 +374,7 @@ export const skillRegenConfig = {
 							id: "farming_xp_a",
 							priority: 30,
 							durationTicks: 30,
-							content: ["+${xpGain}"],
+							content: ["§3+${xpGain}"],
 						},
 					},
 				},

@@ -94,6 +94,60 @@ function getTitleDefaults(config) {
 	};
 }
 
+function normalizeSkillId(skill) {
+	return String(skill ?? "").trim().toLowerCase();
+}
+
+function getSkillProgressObjectiveIds(config, skill, xpRule) {
+	const bySkill = config?.runtime?.titles?.progressObjectivesBySkill;
+	const key = normalizeSkillId(skill);
+	const runtimeSkill = bySkill && typeof bySkill === "object" ? bySkill[key] : null;
+
+	const fallbackBySkill = {
+		mining: { xp: "SkillXpMineria", level: "SkillLvlMineria" },
+		foraging: { xp: "SkillXpTala", level: "SkillLvlTala" },
+		farming: { xp: "SkillXpCosecha", level: "SkillLvlCosecha" },
+	};
+
+	const fallback = fallbackBySkill[key] || null;
+	const xpObjective = String(xpRule?.gainObjective ?? runtimeSkill?.xp ?? fallback?.xp ?? "").trim();
+	const levelObjective = String(xpRule?.levelObjective ?? runtimeSkill?.level ?? fallback?.level ?? "").trim();
+	return { xpObjective, levelObjective };
+}
+
+function getProvisionalRequirementPerLevel(config) {
+	const raw = Number(config?.runtime?.titles?.provisional?.requirementPerLevel);
+	if (!Number.isFinite(raw) || raw <= 0) return 50;
+	return Math.max(1, Math.trunc(raw));
+}
+
+function computeProvisionalXpRequirement(config, level) {
+	const lvl = Math.max(0, Math.trunc(Number(level) || 0));
+	const base = getProvisionalRequirementPerLevel(config);
+	return Math.max(base, (lvl + 1) * base);
+}
+
+function buildXpTitlePayload(config, player, blockDef, xpRule, xpGain) {
+	const skill = normalizeSkillId(blockDef?.skill);
+	const gain = Math.max(0, Math.trunc(Number(xpGain?.gain) || 0));
+	const objectiveIds = getSkillProgressObjectiveIds(config, skill, xpRule);
+
+	const currentXp = objectiveIds.xpObjective ? (getScoreBestEffort(player, objectiveIds.xpObjective) ?? 0) : 0;
+	const currentLevel = objectiveIds.levelObjective ? (getScoreBestEffort(player, objectiveIds.levelObjective) ?? 0) : 0;
+	const xpActual = Math.max(0, currentXp + gain);
+	const xpRequeriment = computeProvisionalXpRequirement(config, currentLevel);
+
+	return {
+		xpGain: gain,
+		xpActual,
+		xpRequeriment,
+		xpRequirement: xpRequeriment,
+		skill,
+		skillXpObjective: objectiveIds.xpObjective,
+		skillLvlObjective: objectiveIds.levelObjective,
+	};
+}
+
 function getScoreboardAddsOnBreak(config) {
 	const v = config && config.metrics && config.metrics.scoreboardAddsOnBreak;
 	return v && typeof v === "object" ? v : null;
@@ -148,6 +202,10 @@ function applyScoreboardAddsBestEffort(config, dimension, player, addsObj) {
 
 			// Fallback: comando (puede requerir cheats habilitados)
 			if (!dimension || typeof dimension.runCommandAsync !== "function" || !player.name) continue;
+			if (!isSafeCommandToken(objective)) {
+				if (debugEnabled(config)) dbg(config, `scoreboard: objective '${objective}' inválido para fallback command (skip)`);
+				continue;
+			}
 			const target = quoteForCommand(player.name);
 			const cmd = `scoreboard players add ${target} ${objective} ${Math.trunc(delta)}`;
 			dimension.runCommandAsync(cmd);
@@ -218,17 +276,15 @@ function renderTitleContent(templateLines, payload) {
 	});
 }
 
-function emitXpTitleBestEffort(config, player, blockDef, selected, xpGain) {
+function emitXpTitleBestEffort(config, player, blockDef, selected, xpRule, xpGain) {
 	if (!player || !selected || !xpGain || xpGain.gain <= 0) return;
 	const titleRule = getModifierTitleRule(selected);
 	const defaults = getTitleDefaults(config);
 	if (titleRule && titleRule.enabled !== true) return;
 	if (!titleRule && !defaults.enabledByDefault) return;
 
-	const content = renderTitleContent(titleRule.content ?? defaults.contentTemplate, {
-		xpGain: xpGain.gain,
-		skill: blockDef?.skill ?? "",
-	});
+	const payload = buildXpTitlePayload(config, player, blockDef, xpRule, xpGain);
+	const content = renderTitleContent(titleRule.content ?? defaults.contentTemplate, payload);
 
 	upsertTemporaryTitle({
 		target: player,
@@ -794,7 +850,7 @@ export function initMiningRegen(userConfig) {
 							if (xpRule && xpGain && xpGain.gain > 0) {
 							const gainObjective = String(xpRule.gainObjective ?? "").trim();
 							if (gainObjective) xpAdds = { [gainObjective]: xpGain.gain };
-								emitXpTitleBestEffort(config, player, blockDef, selected, xpGain);
+								emitXpTitleBestEffort(config, player, blockDef, selected, xpRule, xpGain);
 						}
 
 						const merged = mergeScoreboardAdds(mergeScoreboardAdds(mergeScoreboardAdds(globalAdds, blockAdds), modifierAdds), xpAdds);

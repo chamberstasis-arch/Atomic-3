@@ -222,7 +222,7 @@ export const skillRegenConfig = {
 					mode: "override",
 					when: {
 						all: [
-							{ score: { objective: "FortMinTotalH", range: { min: 10, max: 99 } } },
+							{ score: { objective: "FortMinTotalH", range: { min: 0, max: 99 } } },
 						],
 					},
 					effects: {
@@ -250,7 +250,7 @@ export const skillRegenConfig = {
 					mode: "override",
 					when: {
 						all: [
-							{ score: { objective: "FortMinTotalH", range: { min: 100, max: 200 } } },
+							{ score: { objective: "FortMinTotalH", range: { min: 100 } } },
 						],
 					},
 					effects: {

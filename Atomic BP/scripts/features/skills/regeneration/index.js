@@ -19,6 +19,7 @@ import {
 import { runDropsTable } from "./drops.js";
 import { validateMiningRegenConfig } from "./validate.js";
 import { upsertTemporaryTitle } from "../../../systems/titlesPriority/index.js";
+import { onSkillScoreboardsApplied } from "../mining/index.js";
 import {
 	computeRemainingTicks,
 	initSkillRegenDynamicProperties,
@@ -279,20 +280,21 @@ function renderTitleContent(templateLines, payload) {
 function emitXpTitleBestEffort(config, player, blockDef, selected, xpRule, xpGain) {
 	if (!player || !selected || !xpGain || xpGain.gain <= 0) return;
 	const titleRule = getModifierTitleRule(selected);
+	const title = titleRule && typeof titleRule === "object" ? titleRule : {};
 	const defaults = getTitleDefaults(config);
 	if (titleRule && titleRule.enabled !== true) return;
 	if (!titleRule && !defaults.enabledByDefault) return;
 
 	const payload = buildXpTitlePayload(config, player, blockDef, xpRule, xpGain);
-	const content = renderTitleContent(titleRule.content ?? defaults.contentTemplate, payload);
+	const content = renderTitleContent(title.content ?? defaults.contentTemplate, payload);
 
 	upsertTemporaryTitle({
 		target: player,
-		source: String(titleRule.source ?? defaults.source),
-		id: String(titleRule.id ?? `xp_${String(blockDef?.skill ?? "unknown")}`),
-		priority: Number.isFinite(Number(titleRule.priority)) ? Number(titleRule.priority) : defaults.priority,
-		durationTicks: Number.isFinite(Number(titleRule.durationTicks)) ? Number(titleRule.durationTicks) : defaults.durationTicks,
-		durationMs: Number.isFinite(Number(titleRule.durationMs)) ? Number(titleRule.durationMs) : undefined,
+		source: String(title.source ?? defaults.source),
+		id: String(title.id ?? `xp_${String(blockDef?.skill ?? "unknown")}`),
+		priority: Number.isFinite(Number(title.priority)) ? Number(title.priority) : defaults.priority,
+		durationTicks: Number.isFinite(Number(title.durationTicks)) ? Number(title.durationTicks) : defaults.durationTicks,
+		durationMs: Number.isFinite(Number(title.durationMs)) ? Number(title.durationMs) : undefined,
 		content,
 	});
 }
@@ -854,7 +856,10 @@ export function initMiningRegen(userConfig) {
 						}
 
 						const merged = mergeScoreboardAdds(mergeScoreboardAdds(mergeScoreboardAdds(globalAdds, blockAdds), modifierAdds), xpAdds);
-						if (merged) applyScoreboardAddsBestEffort(config, dim, player, merged);
+						if (merged) {
+							applyScoreboardAddsBestEffort(config, dim, player, merged);
+							onSkillScoreboardsApplied(player, merged);
+						}
 					}
 
 					// Registrar regeneración (esto también mete key en persistencia)

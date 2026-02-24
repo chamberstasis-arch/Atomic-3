@@ -44,12 +44,6 @@ Para esta feature se oficializan estos objetivos:
 - SkillXpMineria: XP acumulada total de minería.
 - SkillLvlMineria: nivel actual de minería.
 
-Notas:
-
-- Estos nombres se usarán como contrato aunque en esta rama aún no estén mergeados.
-- La XP no se reinicia al subir nivel; siempre es acumulativa.
-
----
 
 ## 4) Reglas funcionales de nivelado
 

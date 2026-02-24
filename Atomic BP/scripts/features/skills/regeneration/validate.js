@@ -86,6 +86,11 @@ function validateModifierRule(rule, label, warnings) {
 	if (isObj(effects.xp)) {
 		if (!isFiniteNumber(effects.xp.base) || Number(effects.xp.base) <= 0) warnings.push(`${label}: effects.xp.base debería ser > 0`);
 		if (!asStr(effects.xp.scalingObjective)) warnings.push(`${label}: effects.xp.scalingObjective es requerido`);
+		if (effects.xp.gainObjective != null && !asStr(effects.xp.gainObjective)) warnings.push(`${label}: effects.xp.gainObjective inválido`);
+		if (effects.xp.levelObjective != null && !asStr(effects.xp.levelObjective)) warnings.push(`${label}: effects.xp.levelObjective inválido`);
+		if (effects.xp.stepPerPoints != null && (!isFiniteNumber(effects.xp.stepPerPoints) || Number(effects.xp.stepPerPoints) <= 0)) {
+			warnings.push(`${label}: effects.xp.stepPerPoints debería ser > 0`);
+		}
 	}
 	if (effects.title != null && !isObj(effects.title)) warnings.push(`${label}: effects.title debería ser objeto`);
 }

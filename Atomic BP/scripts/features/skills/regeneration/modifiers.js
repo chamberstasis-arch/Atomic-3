@@ -286,3 +286,80 @@ export function getModifierTitleRule(selected) {
 	if (!title || typeof title !== "object") return null;
 	return title;
 }
+
+// ─── Fortune Tiers: resolución probabilística ───────────────────────────────────
+// Algoritmo:
+//   1. Leer puntaje de fortuna del jugador (objective configurado).
+//   2. tierIndex = floor(fortune / step), acotado a [0, tiers.length - 1].
+//   3. remainder = fortune % step.
+//   4. Si remainder > 0 Y existe tier siguiente: roll random [0..step).
+//      - Si roll < remainder → usar tier siguiente.
+//      - Si no → usar tier actual.
+//   5. Retornar estructura compatible con selectActiveModifier (key/id/mode/effects/source).
+//
+// Ejemplo (step=100): fortune=150 → tierIndex=1, remainder=50
+//   → 50% tier[2], 50% tier[1].
+
+/**
+ * Resuelve un resultado de fortune tiers con probabilidad interpolada.
+ * Retorna un objeto compatible con el resultado de selectActiveModifier,
+ * o null si no hay fortuneTiers válido.
+ *
+ * @param {{ objective:string, step:number, tiers:any[] }} fortuneTiers
+ * @param {any} player
+ * @returns {{ key:string, id:string, mode:string, def:any, effects:any, source:string } | null}
+ */
+export function resolveFortuneResult(fortuneTiers, player) {
+	if (!fortuneTiers || typeof fortuneTiers !== "object") return null;
+
+	const objective = safeString(fortuneTiers.objective);
+	const step = toIntOr(fortuneTiers.step, 100);
+	const tiers = Array.isArray(fortuneTiers.tiers) ? fortuneTiers.tiers : [];
+	if (!objective || step <= 0 || tiers.length === 0) return null;
+
+	// Leer puntaje de fortuna del jugador (clamp >= 0)
+	const fortune = Math.max(0, getScoreBestEffort(player, objective) ?? 0);
+
+	// Encontrar tier actual (index por posición, acotado al último tier)
+	const maxTierIndex = tiers.length - 1;
+	let tierIndex = Math.min(Math.floor(fortune / step), maxTierIndex);
+	let selectedTier = tiers[tierIndex];
+
+	// Probabilidad de obtener el tier siguiente
+	const remainder = fortune % step;
+	if (remainder > 0 && tierIndex < maxTierIndex) {
+		const roll = Math.floor(Math.random() * step);
+		if (roll < remainder) {
+			tierIndex = tierIndex + 1;
+			selectedTier = tiers[tierIndex];
+		}
+	}
+
+	if (!selectedTier || typeof selectedTier !== "object") return null;
+
+	// Construir effects — solo drops y scoreboardAddsOnBreak.
+	// XP y title son INDEPENDIENTES de fortuna (se leen del block-level).
+	const tierEffects =
+		selectedTier.effects && typeof selectedTier.effects === "object" ? selectedTier.effects : null;
+
+	const effects = {};
+
+	// Drops (siempre del tier seleccionado)
+	const tierDrops = Array.isArray(selectedTier.drops) ? selectedTier.drops : [];
+	if (tierDrops.length) effects.drops = tierDrops;
+
+	// scoreboardAddsOnBreak (solo del tier)
+	const sbAdds = tierEffects?.scoreboardAddsOnBreak;
+	if (sbAdds && typeof sbAdds === "object") effects.scoreboardAddsOnBreak = sbAdds;
+
+	const tierId = safeString(selectedTier.id) || `fortune_tier_${tierIndex}`;
+
+	return {
+		key: tierId,
+		id: tierId,
+		mode: "override",
+		def: selectedTier,
+		effects,
+		source: "fortune-tiers",
+	};
+}

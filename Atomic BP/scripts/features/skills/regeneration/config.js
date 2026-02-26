@@ -34,6 +34,21 @@
  * }} ModifierRule
  *
  * @typedef {{
+ *  id?: string,
+ *  threshold: number,
+ *  drops: DropEntryTuple[],
+ *  effects?: {
+ *    scoreboardAddsOnBreak?: Record<string, number>,
+ *  },
+ * }} FortuneTierEntry
+ *
+ * @typedef {{
+ *  objective: string,
+ *  step: number,
+ *  tiers: FortuneTierEntry[],
+ * }} FortuneTiersConfig
+ *
+ * @typedef {{
  *  id: string,
  *  // Identificador de skill asociada al bloque (ej: "mining", "farming", "foraging", ...)
  *  skill: string,
@@ -67,7 +82,16 @@
  *  // - Formato: { "OBJETIVO": numeroAAgregar }
  *  scoreboardAddsOnBreak?: Record<string, number>,
  *  drops: DropEntryTuple[],
-	 *  modifiers?: ModifierRule[]
+ *  modifiers?: ModifierRule[],
+ *  // Fortune tiers: sistema probabilístico de drops por valor de fortuna.
+ *  // Reemplaza modifiers de rango para fortuna. Cada tier define drops para un umbral.
+ *  // fortune % step = probabilidad de obtener el tier superior (interpolación lineal).
+ *  fortuneTiers?: FortuneTiersConfig,
+ *  // XP de skill (independiente de fortuna). Se aplica siempre que se mine el bloque.
+ *  // Escala con scalingObjective (ej: ExpMinTotalH) pero NO varía por tier de fortuna.
+ *  xp?: { base:number, scalingObjective:string, gainObjective?:string, levelObjective?:string, stepPerPoints?:number },
+ *  // Título de XP (independiente de fortuna). Visual que se muestra al ganar XP.
+ *  xpTitle?: { enabled:boolean, source?:string, id?:string, priority?:number, durationTicks?:number, content?:string[] },
  * }} BlockDefinition
  */
 
@@ -209,72 +233,64 @@ export const skillRegenConfig = {
 			// minedBlockId opcional: si lo omites usa defaultMinedBlockId
 			// minedBlockId: "minecraft:black_concrete",
 			drops: [
-				// Ejemplo base (sin fortuna): 50% 1-2 carbón
+				// Fallback base (solo si fortuneTiers no aplica): 30% 1-2 carbón
 				[1, "minecraft:coal", 1, 2, 30, "§jCarbón", ["§7Mineral regenerable"]],
-				// Drop extra raro: 10% 1 pepita de hierro (solo para probar  tabla)
 				[2, "minecraft:iron_nugget", 1, 1, 70, "§fPepita", ["§7Drop de prueba"]],
 			],
-			modifiers: [
-				{
-					id: "FortunaMinera_A",
-					priority: 20,
-					mode: "override",
-					when: {
-						all: [
-							{ score: { objective: "FortMinTotalH", range: { min: 0, max: 99 } } },
+			// XP de skill: independiente de fortuna. Escala con ExpMinTotalH.
+			xp: {
+				base: 8,
+				scalingObjective: "ExpMinTotalH",
+				gainObjective: "SkillXpMineria",
+				levelObjective: "SkillLvlMineria",
+				stepPerPoints: 10,
+			},
+			// Título visual de XP: independiente de fortuna.
+			xpTitle: {
+				enabled: true,
+				source: "regen_xp",
+				id: "mining_xp",
+				priority: 40,
+				durationTicks: 40,
+				content: ["§3+${xpGain} ${xpActual}/${xpRequeriment}"],
+			},
+			// Fortune tiers: sistema probabilístico basado en FortMinTotalH.
+			// Solo afecta DROPS y scoreboardAdds por tier. XP/title son block-level.
+			// Cada 100 puntos de fortuna = nuevo tier.
+			// fortune % step = probabilidad de obtener el tier superior.
+			// Ej: 150 fortuna → 50% tier-200, 50% tier-100.
+			fortuneTiers: {
+				objective: "FortMinTotalH",
+				step: 100,
+				tiers: [
+					{
+						id: "FortunaMinera_0",
+						threshold: 0,
+						drops: [[1, "minecraft:coal", 1, 3, 65, "§jCarbón", ["§7Fortuna Minera 0"]]],
+					},
+					{
+						id: "FortunaMinera_1",
+						threshold: 100,
+						drops: [[1, "minecraft:coal", 2, 6, 85, "§jCarbón", ["§7Fortuna Minera I"]]],
+						effects: {
+							scoreboardAddsOnBreak: { DINERO: 2 },
+						},
+					},
+					{
+						id: "FortunaMinera_2",
+						threshold: 200,
+						drops: [
+							[1, "minecraft:coal", 4, 8, 90, "§jCarbón", ["§7Fortuna Minera II"]],
+							[2, "minecraft:iron_nugget", 1, 1, 30, "§fPepita", ["§7Fortuna Minera II"]],
 						],
-					},
-					effects: {
-						drops: [[1, "minecraft:coal", 1, 3, 65, "§jCarbón", ["§7Fortuna Minera A"]]],
-						xp: {
-							base: 8,
-							scalingObjective: "ExpMinTotalH",
-							gainObjective: "SkillXpMineria",
-							levelObjective: "SkillLvlMineria",
-							stepPerPoints: 10,
-						},
-						title: {
-							enabled: true,
-							source: "regen_xp",
-							id: "mining_xp_a",
-							priority: 40,
-							durationTicks: 40,
-							content: ["§3+${xpGain} ${xpActual}/${xpRequeriment}"],
+						effects: {
+							scoreboardAddsOnBreak: { DINERO: 4 },
 						},
 					},
-				},
-				{
-					id: "FortunaMinera_B",
-					priority: 21,
-					mode: "override",
-					when: {
-						all: [
-							{ score: { objective: "FortMinTotalH", range: { min: 100 } } },
-						],
-					},
-					effects: {
-						drops: [[1, "minecraft:coal", 2, 6, 85, "§jCarbón", ["§7Fortuna Minera B"]]],
-						scoreboardAddsOnBreak: {
-							DINERO: 2,
-						},
-						xp: {
-							base: 12,
-							scalingObjective: "ExpMinTotalH",
-							gainObjective: "SkillXpMineria",
-							levelObjective: "SkillLvlMineria",
-							stepPerPoints: 10,
-						},
-						title: {
-							enabled: true,
-							source: "regen_xp",
-							id: "mining_xp_b",
-							priority: 41,
-							durationTicks: 40,
-							content: ["§3+${xpGain} ${xpActual}/${xpRequeriment}"],
-						},
-					},
-				},
-			],
+				],
+			},
+			// Modifiers vacío: reservado para overrides especiales (ej: silk touch)
+			modifiers: [],
 		}
 		,
 		// TEST: tronco de roble (skill: foraging)

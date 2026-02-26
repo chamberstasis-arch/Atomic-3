@@ -14,6 +14,7 @@ import {
 	getModifierTitleRule,
 	getModifierXpRule,
 	resolveDropsTable,
+	resolveFortuneResult,
 	selectActiveModifier,
 } from "./modifiers.js";
 import { runDropsTable } from "./drops.js";
@@ -289,8 +290,10 @@ function renderTitleContent(templateLines, payload) {
 }
 
 function emitXpTitleBestEffort(config, player, blockDef, selected, xpRule, xpGain) {
-	if (!player || !selected || !xpGain || xpGain.gain <= 0) return;
-	const titleRule = getModifierTitleRule(selected);
+	if (!player || !xpGain || xpGain.gain <= 0) return;
+	// Title: modifier > block-level xpTitle > config defaults
+	const titleRule = getModifierTitleRule(selected)
+		?? (blockDef?.xpTitle && typeof blockDef.xpTitle === "object" ? blockDef.xpTitle : null);
 	const title = titleRule && typeof titleRule === "object" ? titleRule : {};
 	const defaults = getTitleDefaults(config);
 	if (titleRule && titleRule.enabled !== true) return;
@@ -820,13 +823,19 @@ export function initMiningRegen(userConfig) {
 						// (No lo repetimos aquí para evitar doble sonido.)
 
 					// Resolver modifier scoreboard-driven.
-					const selected = selectActiveModifier(blockDef, {
+					let selected = selectActiveModifier(blockDef, {
 						player,
 						blockDef,
 						dimensionId,
 						blockPos,
 						areas: Array.isArray(config?.areas) ? config.areas : [],
 					});
+
+					// Fortune tiers: si no hay modifier activo, aplicar sistema probabilístico.
+					if (!selected && blockDef.fortuneTiers) {
+						selected = resolveFortuneResult(blockDef.fortuneTiers, player);
+					}
+
 					const dropsTable = resolveDropsTable(blockDef, selected);
 
 					// Partículas: best-effort (keys configurables)
@@ -860,7 +869,9 @@ export function initMiningRegen(userConfig) {
 						const modifierAdds = getModifierScoreboardAdds(selected);
 
 						let xpAdds = null;
-						const xpRule = getModifierXpRule(selected);
+						// XP: modifier > block-level xp (independiente de fortuna)
+						const xpRule = getModifierXpRule(selected)
+							?? (blockDef?.xp && typeof blockDef.xp === "object" ? blockDef.xp : null);
 						const xpGain = resolveXpGain(xpRule, player);
 							if (xpRule && xpGain && xpGain.gain > 0) {
 							const gainObjective = String(xpRule.gainObjective ?? "").trim();

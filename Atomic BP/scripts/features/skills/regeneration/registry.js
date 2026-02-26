@@ -227,6 +227,51 @@ function normalizeModifiers(value) {
 	return out.length ? out : undefined;
 }
 
+// ─── Fortune Tiers normalization ─────────────────────────────────────────────
+
+function normalizeFortuneTierEffects(value) {
+	if (!value || typeof value !== "object") return undefined;
+	const out = {};
+	const sbAdds = normalizeScoreboardAdds(value.scoreboardAddsOnBreak);
+	if (sbAdds) out.scoreboardAddsOnBreak = sbAdds;
+	// XP y title NO van en fortune tiers (son block-level, independientes de fortuna)
+	return Object.keys(out).length ? out : undefined;
+}
+
+function normalizeFortuneTierEntry(value, index) {
+	if (!value || typeof value !== "object") return null;
+	const id = normalizeString(value.id) || `fortune_tier_${index}`;
+	const threshold = toNumberOr(value.threshold, NaN);
+	if (!Number.isFinite(threshold) || threshold < 0) return null;
+	const drops = Array.isArray(value.drops) ? value.drops : [];
+	const effects = normalizeFortuneTierEffects(value.effects);
+	return {
+		id,
+		threshold: Math.trunc(threshold),
+		drops,
+		...(effects ? { effects } : {}),
+	};
+}
+
+function normalizeFortuneTiers(value) {
+	if (!value || typeof value !== "object") return undefined;
+	const objective = normalizeString(value.objective);
+	if (!objective) return undefined;
+	const step = toNumberOr(value.step, 100);
+	if (step <= 0) return undefined;
+	const rawTiers = Array.isArray(value.tiers) ? value.tiers : [];
+	const tiers = rawTiers
+		.map((t, i) => normalizeFortuneTierEntry(t, i))
+		.filter(Boolean)
+		.sort((a, b) => a.threshold - b.threshold);
+	if (tiers.length === 0) return undefined;
+	return {
+		objective,
+		step: Math.trunc(step),
+		tiers,
+	};
+}
+
 /**
  * Normaliza una definición de mineral para que el runtime no tenga que hacer checks repetidos.
  * @param {any} oreDef
@@ -253,6 +298,11 @@ export function normalizeBlockDefinition(blockDef, config) {
 
 	const drops = Array.isArray(blockDef && blockDef.drops) ? blockDef.drops : [];
 	const modifiers = normalizeModifiers(blockDef && blockDef.modifiers);
+	const fortuneTiers = normalizeFortuneTiers(blockDef && blockDef.fortuneTiers);
+
+	// XP y xpTitle block-level (independientes de fortuna)
+	const xp = blockDef && blockDef.xp && typeof blockDef.xp === "object" ? blockDef.xp : undefined;
+	const xpTitle = blockDef && blockDef.xpTitle && typeof blockDef.xpTitle === "object" ? blockDef.xpTitle : undefined;
 
 	return {
 		id,
@@ -270,6 +320,9 @@ export function normalizeBlockDefinition(blockDef, config) {
 		areaIds,
 		drops,
 		modifiers,
+		fortuneTiers,
+		xp,
+		xpTitle,
 	};
 }
 

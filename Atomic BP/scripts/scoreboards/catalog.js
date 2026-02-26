@@ -38,9 +38,9 @@ function addRegenObjectives(list, seen, config) {
 		addObjectivesFromMap(list, seen, block?.scoreboardAddsOnBreak);
 
 		const modifiers = block?.modifiers;
-		if (!modifiers) continue;
-
-		if (Array.isArray(modifiers)) {
+		if (!modifiers) {
+			// noop: no modifiers to scan
+		} else if (Array.isArray(modifiers)) {
 			for (const rule of modifiers) {
 				if (!rule || typeof rule !== "object") continue;
 				const effects = rule?.effects && typeof rule.effects === "object" ? rule.effects : rule;
@@ -50,12 +50,28 @@ function addRegenObjectives(list, seen, config) {
 				const gainObjective = xp ? safeString(xp.gainObjective) : "";
 				if (gainObjective) addObjective(list, seen, gainObjective, gainObjective);
 			}
-			continue;
-		}
-
-		if (typeof modifiers === "object") {
+		} else if (typeof modifiers === "object") {
 			for (const mod of Object.values(modifiers)) {
 				addObjectivesFromMap(list, seen, mod?.scoreboardAddsOnBreak);
+			}
+		}
+
+		// XP block-level (independiente de fortuna)
+		const blockXp = block?.xp && typeof block.xp === "object" ? block.xp : null;
+		if (blockXp) {
+			const go = safeString(blockXp.gainObjective);
+			if (go) addObjective(list, seen, go, go);
+		}
+
+		// Fortune tiers: escanear tiers para scoreboards (solo scoreboardAddsOnBreak)
+		const ft = block?.fortuneTiers;
+		if (ft && typeof ft === "object") {
+			const tiers = Array.isArray(ft.tiers) ? ft.tiers : [];
+			for (const tier of tiers) {
+				if (!tier || typeof tier !== "object") continue;
+				const te = tier.effects && typeof tier.effects === "object" ? tier.effects : null;
+				if (!te) continue;
+				addObjectivesFromMap(list, seen, te.scoreboardAddsOnBreak);
 			}
 		}
 	}

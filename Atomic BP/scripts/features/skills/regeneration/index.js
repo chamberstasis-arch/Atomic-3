@@ -19,7 +19,7 @@ import {
 import { runDropsTable } from "./drops.js";
 import { validateMiningRegenConfig } from "./validate.js";
 import { upsertTemporaryTitle } from "../../../systems/titlesPriority/index.js";
-import { onSkillScoreboardsApplied } from "../mining/index.js";
+import { getMiningNextXpRequirement, onSkillScoreboardsApplied } from "../mining/index.js";
 import {
 	computeRemainingTicks,
 	initSkillRegenDynamicProperties,
@@ -99,6 +99,19 @@ function normalizeSkillId(skill) {
 	return String(skill ?? "").trim().toLowerCase();
 }
 
+function toInt(value, fallback = 0) {
+	const n = Number(value);
+	if (!Number.isFinite(n)) return fallback;
+	return Math.trunc(n);
+}
+
+function formatThousandsInt(value) {
+	const n = toInt(value, 0);
+	const sign = n < 0 ? "-" : "";
+	const digits = String(Math.abs(n));
+	return sign + digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
 function getSkillProgressObjectiveIds(config, skill, xpRule) {
 	const bySkill = config?.runtime?.titles?.progressObjectivesBySkill;
 	const key = normalizeSkillId(skill);
@@ -116,16 +129,10 @@ function getSkillProgressObjectiveIds(config, skill, xpRule) {
 	return { xpObjective, levelObjective };
 }
 
-function getProvisionalRequirementPerLevel(config) {
-	const raw = Number(config?.runtime?.titles?.provisional?.requirementPerLevel);
-	if (!Number.isFinite(raw) || raw <= 0) return 50;
-	return Math.max(1, Math.trunc(raw));
-}
-
-function computeProvisionalXpRequirement(config, level) {
-	const lvl = Math.max(0, Math.trunc(Number(level) || 0));
-	const base = getProvisionalRequirementPerLevel(config);
-	return Math.max(base, (lvl + 1) * base);
+function getNoLevelsTitleTemplate(config) {
+	const raw = config?.runtime?.titles?.noLevelsContentTemplate;
+	if (Array.isArray(raw) && raw.length > 0) return raw;
+	return ["+${xpGain} (${xpTotal})"];
 }
 
 function buildXpTitlePayload(config, player, blockDef, xpRule, xpGain) {
@@ -136,13 +143,17 @@ function buildXpTitlePayload(config, player, blockDef, xpRule, xpGain) {
 	const currentXp = objectiveIds.xpObjective ? (getScoreBestEffort(player, objectiveIds.xpObjective) ?? 0) : 0;
 	const currentLevel = objectiveIds.levelObjective ? (getScoreBestEffort(player, objectiveIds.levelObjective) ?? 0) : 0;
 	const xpActual = Math.max(0, currentXp + gain);
-	const xpRequeriment = computeProvisionalXpRequirement(config, currentLevel);
+	const requirementFromCatalog = skill === "mining" ? Number(getMiningNextXpRequirement(currentLevel)) : NaN;
+	const hasLevelRequirement = Number.isFinite(requirementFromCatalog) && requirementFromCatalog > 0;
+	const xpRequeriment = hasLevelRequirement ? Math.trunc(requirementFromCatalog) : 0;
 
 	return {
-		xpGain: gain,
-		xpActual,
-		xpRequeriment,
-		xpRequirement: xpRequeriment,
+		hasLevelRequirement,
+		xpGain: formatThousandsInt(gain),
+		xpActual: formatThousandsInt(xpActual),
+		xpTotal: formatThousandsInt(xpActual),
+		xpRequeriment: hasLevelRequirement ? formatThousandsInt(xpRequeriment) : "",
+		xpRequirement: hasLevelRequirement ? formatThousandsInt(xpRequeriment) : "",
 		skill,
 		skillXpObjective: objectiveIds.xpObjective,
 		skillLvlObjective: objectiveIds.levelObjective,
@@ -286,7 +297,9 @@ function emitXpTitleBestEffort(config, player, blockDef, selected, xpRule, xpGai
 	if (!titleRule && !defaults.enabledByDefault) return;
 
 	const payload = buildXpTitlePayload(config, player, blockDef, xpRule, xpGain);
-	const content = renderTitleContent(title.content ?? defaults.contentTemplate, payload);
+	const template = title.content ?? defaults.contentTemplate;
+	const chosenTemplate = payload.hasLevelRequirement ? template : getNoLevelsTitleTemplate(config);
+	const content = renderTitleContent(chosenTemplate, payload);
 
 	upsertTemporaryTitle({
 		target: player,

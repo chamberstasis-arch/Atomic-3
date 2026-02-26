@@ -338,3 +338,5 @@ Esto permite que mining levels sea independiente de la lógica de drops/regenera
 - Visual de niveles en números romanos.
 - Recompensa base por nivel 1..60: `+4` a `FortMin` (acumulativa por nivel actual).
 - Si el nivel baja por XP, se retiran recompensas de niveles superiores automáticamente.
+
+

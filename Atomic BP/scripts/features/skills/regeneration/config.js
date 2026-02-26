@@ -110,12 +110,11 @@ export const skillRegenConfig = {
 			// - ${xpActual}
 			// - ${xpRequeriment} (compat con el naming actual)
 			// - ${xpRequirement} (alias)
+			// - ${xpTotal}
 			// - ${skill}
 			contentTemplate: ["+${xpGain}"],
-			// Provisional: requirement para siguiente nivel = (nivelActual + 1) * requirementPerLevel
-			provisional: {
-				requirementPerLevel: 50,
-			},
+			// Fallback visual cuando no hay catálogo de niveles consumible para la skill.
+			noLevelsContentTemplate: ["+${xpGain} (${xpTotal})"],
 			progressObjectivesBySkill: {
 				mining: { xp: "SkillXpMineria", level: "SkillLvlMineria" },
 				foraging: { xp: "SkillXpTala", level: "SkillLvlTala" },

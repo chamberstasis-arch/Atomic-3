@@ -191,6 +191,8 @@ export const upgradesUiConfig = {
 		{ key: "forgotten", qualityText: "§j§lOLVIDADO", paneName: "§j§lOLVIDADO", paneTexture: "g/gray", paneDescription: ["Olvidado"] },
 		{ key: "relic", qualityText: "§s§lRELIQUÍA", paneName: "§s§lRELIQUÍA", paneTexture: "g/cyan", paneDescription: ["Reliquía"] },
 		{ key: "special", qualityText: "§c§lESPECIAL", paneName: "§c§lESPECIAL", paneTexture: "g/red", paneDescription: ["Especial"] },
+
+		// Rarezas maximas
 		{ key: "anatema", qualityText: "§m§lANA§4TEMA", paneName: "§m§lANA§4TEMA", paneTexture: "g/red", paneDescription: ["Anatema"] },
 		{ key: "absolute", qualityText: "§b§lABSO§fLUTO", paneName: "§b§lABSO§fLUTO", paneTexture: "g/light_blue", paneDescription: ["Absoluto"] },
 		{ key: "limitless", qualityText: "§4§lL§cI§vM§gI§eT§aL§qE§sS§9S", paneName: "§4§lL§cI§vM§gI§eT§aL§qE§sS§9S", paneTexture: "g/white", paneDescription: ["Sin límites"] },

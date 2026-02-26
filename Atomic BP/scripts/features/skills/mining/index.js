@@ -124,13 +124,54 @@ function normalizeRequirement(req) {
 	return { type: "scoreboardMin", objective, min };
 }
 
-function normalizeLevelEntry(entry, index, maxLevel) {
+function normalizeScoreboardAddItem(value, defaultObjective = "D") {
+	if (value == null) return null;
+	if (typeof value === "number") {
+		const amount = toInt(value, NaN);
+		if (!Number.isFinite(amount)) return null;
+		return { objective: asStr(defaultObjective) || "D", amount };
+	}
+	if (typeof value !== "object") return null;
+	const objective = asStr(value.objective) || asStr(defaultObjective) || "D";
+	const amount = toInt(value.amount, NaN);
+	if (!objective || !Number.isFinite(amount)) return null;
+	return { objective, amount };
+}
+
+function normalizeScoreboardAddDRanges(raw, maxLevel) {
+	if (!Array.isArray(raw)) return [];
+	const ranges = [];
+	for (const entry of raw) {
+		if (!entry || typeof entry !== "object") continue;
+		const fromLevel = Math.max(1, toInt(entry.fromLevel ?? entry.from, NaN));
+		const toLevel = Math.min(maxLevel, toInt(entry.toLevel ?? entry.to, NaN));
+		const amount = toInt(entry.amount, NaN);
+		if (!Number.isFinite(fromLevel) || !Number.isFinite(toLevel) || !Number.isFinite(amount)) continue;
+		if (toLevel < fromLevel) continue;
+		ranges.push({ fromLevel, toLevel, amount });
+	}
+	return ranges;
+}
+
+function getDefaultScoreboardAddDForLevel(level, options = {}) {
+	const ranges = Array.isArray(options.defaultScoreboardAddDRanges) ? options.defaultScoreboardAddDRanges : [];
+	for (const range of ranges) {
+		if (!range || typeof range !== "object") continue;
+		if (level >= range.fromLevel && level <= range.toLevel) {
+			return toInt(range.amount, 0);
+		}
+	}
+	return toInt(options.defaultScoreboardAddD, 0);
+}
+
+function normalizeLevelEntry(entry, index, maxLevel, options = {}) {
 	if (!entry || typeof entry !== "object") return null;
 	const level = toInt(entry.level, NaN);
 	const xpRequired = toInt(entry.xpRequired, NaN);
 	if (!Number.isFinite(level) || !Number.isFinite(xpRequired)) return null;
 	if (level < 1 || level > maxLevel) return null;
 	if (xpRequired < 0) return null;
+	const defaultScoreboardAddD = getDefaultScoreboardAddDForLevel(level, options);
 
 	const requirementsRaw = Array.isArray(entry.requirements) ? entry.requirements : [];
 	const requirements = requirementsRaw.map(normalizeRequirement).filter(Boolean);
@@ -147,26 +188,67 @@ function normalizeLevelEntry(entry, index, maxLevel) {
 		scoreboardAdds.push({ objective, amount });
 	}
 
-	const messageAwards = Array.isArray(rewards.messageAwards)
-		? rewards.messageAwards.map((v) => asStr(v)).filter(Boolean)
-		: [];
+	const directAddD = toInt(entry.scoreboardAddD, NaN);
+	if (Number.isFinite(directAddD)) {
+		scoreboardAdds.push({ objective: "D", amount: directAddD });
+	}
+
+	const directAddsRaw = entry.scoreboardAdd;
+	if (Array.isArray(directAddsRaw)) {
+		for (const item of directAddsRaw) {
+			const normalized = normalizeScoreboardAddItem(item, "D");
+			if (normalized) scoreboardAdds.push(normalized);
+		}
+	} else {
+		const normalized = normalizeScoreboardAddItem(directAddsRaw, "D");
+		if (normalized) scoreboardAdds.push(normalized);
+	}
+
+	if (scoreboardAdds.length === 0 && defaultScoreboardAddD !== 0) {
+		scoreboardAdds.push({ objective: "D", amount: defaultScoreboardAddD });
+	}
+
+	const addsMerged = [];
+	/** @type {Record<string, number>} */
+	const addsMap = {};
+	for (const add of scoreboardAdds) {
+		const objective = asStr(add.objective);
+		if (!objective) continue;
+		addsMap[objective] = toInt(addsMap[objective], 0) + toInt(add.amount, 0);
+	}
+	for (const [objective, amount] of Object.entries(addsMap)) {
+		if (amount === 0) continue;
+		addsMerged.push({ objective, amount });
+	}
+
+	let messageAwards = [];
+	if (Array.isArray(rewards.messageAwards)) {
+		messageAwards = rewards.messageAwards.map((v) => asStr(v)).filter(Boolean);
+	} else {
+		const oneAward = asStr(rewards.messageAwards);
+		if (oneAward) messageAwards = [oneAward];
+	}
 
 	return {
-		id: `level_${index + 1}`,
+		id: asStr(entry.id) || `level_${index + 1}`,
 		level,
 		xpRequired,
 		requirements,
 		rewards: {
-			scoreboardAdds,
+			scoreboardAdds: addsMerged,
 			messageAwards,
 		},
 	};
 }
 
-function normalizeLevels(config) {
+function buildMiningLevelsCatalog(config) {
 	const maxLevel = Math.max(1, toInt(config?.maxLevel, 60));
+	const defaultScoreboardAddD = toInt(config?.rewards?.defaultScoreboardAddD, 0);
+	const defaultScoreboardAddDRanges = normalizeScoreboardAddDRanges(config?.rewards?.defaultScoreboardAddDRanges, maxLevel);
 	const raw = Array.isArray(config?.levels) ? config.levels : [];
-	const out = raw.map((entry, i) => normalizeLevelEntry(entry, i, maxLevel)).filter(Boolean);
+	const out = raw
+		.map((entry, i) => normalizeLevelEntry(entry, i, maxLevel, { defaultScoreboardAddD, defaultScoreboardAddDRanges }))
+		.filter(Boolean);
 	if (out.length === 0) return [];
 	out.sort((a, b) => a.level - b.level);
 
@@ -178,39 +260,24 @@ function normalizeLevels(config) {
 	}
 	if (out[0].level !== 1 || out[0].xpRequired !== 0) return [];
 
-	const gen = config?.levelGeneration && typeof config.levelGeneration === "object" ? config.levelGeneration : null;
-	const generationEnabled = gen ? gen.enabled !== false : true;
-	if (!generationEnabled) return out;
-
-	const startLevelRaw = gen ? toInt(gen.startLevel, out[out.length - 1].level + 1) : out[out.length - 1].level + 1;
-	const xpStepRaw = gen ? toInt(gen.xpStep, 250) : 250;
-	const startLevel = Math.max(2, startLevelRaw);
-	const xpStep = Math.max(1, xpStepRaw);
-
-	let prev = out[out.length - 1];
-	const fromLevel = Math.max(startLevel, prev.level + 1);
-	for (let level = fromLevel; level <= maxLevel; level++) {
-		prev = {
-			id: `level_${level}`,
-			level,
-			xpRequired: prev.xpRequired + xpStep,
-			requirements: [],
-			rewards: {
-				scoreboardAdds: [],
-				messageAwards: [],
-			},
-		};
-		out.push(prev);
-	}
-
 	return out;
+}
+
+function getNextLevelXpRequirement(levelsCatalog, currentLevel) {
+	const levels = Array.isArray(levelsCatalog) ? levelsCatalog : [];
+	const lvl = Math.max(1, toInt(currentLevel, 1));
+	for (const entry of levels) {
+		if (!entry || typeof entry !== "object") continue;
+		if (entry.level > lvl) return entry.xpRequired;
+	}
+	return null;
 }
 
 function getNormalizedConfig() {
 	const cfg = activeConfig && typeof activeConfig === "object" ? activeConfig : miningSkillConfig;
 	const xpObjective = asStr(cfg?.scoreboards?.xp) || "SkillXpMineria";
 	const levelObjective = asStr(cfg?.scoreboards?.level) || "SkillLvlMineria";
-	const levels = normalizeLevels(cfg);
+	const levels = buildMiningLevelsCatalog(cfg);
 	return {
 		raw: cfg,
 		enabled: cfg?.enabled !== false,
@@ -223,6 +290,12 @@ function getNormalizedConfig() {
 		levelUpMessage: Array.isArray(cfg?.levelUpMessage) ? cfg.levelUpMessage.map((v) => String(v ?? "")) : [],
 		levels,
 	};
+}
+
+export function getMiningNextXpRequirement(currentLevel = 1) {
+	const cfg = activeConfig && typeof activeConfig === "object" ? activeConfig : miningSkillConfig;
+	const levels = buildMiningLevelsCatalog(cfg);
+	return getNextLevelXpRequirement(levels, currentLevel);
 }
 
 function requirementPassed(player, req) {
@@ -255,23 +328,34 @@ function resolveLevel(player, cfg, xpCurrent) {
 	return best;
 }
 
-function buildRewardTargets(cfg, resolvedLevel) {
-	const levels = cfg.levels;
+function buildLevelUpRewardAdds(cfg, fromLevel, toLevel) {
 	/** @type {Record<string, number>} */
 	const out = {};
-	for (const entry of levels) {
-		if (entry.level > resolvedLevel) break;
-		const adds = entry.rewards?.scoreboardAdds || [];
+	const from = Math.max(1, toInt(fromLevel, 1));
+	const to = Math.max(from, toInt(toLevel, from));
+	for (const entry of cfg.levels) {
+		if (entry.level < from) continue;
+		if (entry.level > to) break;
+		const adds = Array.isArray(entry.rewards?.scoreboardAdds) ? entry.rewards.scoreboardAdds : [];
 		for (const add of adds) {
 			const objective = asStr(add.objective);
 			if (!objective) continue;
 			out[objective] = toInt(out[objective], 0) + toInt(add.amount, 0);
 		}
 	}
-	if (cfg.fortuneObjective && !(cfg.fortuneObjective in out) && cfg.fortunePerLevel !== 0) {
-		out[cfg.fortuneObjective] = toInt(resolvedLevel, 1) * toInt(cfg.fortunePerLevel, 4);
-	}
 	return out;
+}
+
+function applyAdditiveRewards(player, addsMap) {
+	if (!player?.scoreboardIdentity) return;
+	for (const [objective, amountRaw] of Object.entries(addsMap || {})) {
+		const objectiveId = asStr(objective);
+		if (!objectiveId) continue;
+		const amount = toInt(amountRaw, 0);
+		if (amount === 0) continue;
+		const current = toInt(getScoreBestEffort(player, objectiveId), 0);
+		setScoreBestEffort(player, objectiveId, current + amount);
+	}
 }
 
 function getLevelDef(cfg, level) {
@@ -285,10 +369,11 @@ function renderLevelChangeMessage(cfg, payload, levelDef) {
 	const out = [];
 	for (const rawLine of template) {
 		const line = String(rawLine ?? "");
-		if (!line) continue;
 		if (line.includes("<OtherAwards>")) {
 			if (awards.length === 0) continue;
-			for (const award of awards) out.push(String(award));
+			for (const award of awards) {
+				out.push(line.replaceAll("<OtherAwards>", String(award ?? "")));
+			}
 			continue;
 		}
 
@@ -299,6 +384,24 @@ function renderLevelChangeMessage(cfg, payload, levelDef) {
 		out.push(finalLine);
 	}
 	return out;
+}
+
+function getLevelRewardAmount(levelDef, objectiveId) {
+	const objective = asStr(objectiveId);
+	if (!objective) return 0;
+	const adds = Array.isArray(levelDef?.rewards?.scoreboardAdds) ? levelDef.rewards.scoreboardAdds : [];
+	let total = 0;
+	for (const add of adds) {
+		if (asStr(add?.objective) !== objective) continue;
+		total += toInt(add?.amount, 0);
+	}
+	return total;
+}
+
+function getFortuneTargetForLevel(cfg, level) {
+	const lvl = Math.max(1, toInt(level, 1));
+	const perLevel = toInt(cfg?.fortunePerLevel, 4);
+	return Math.max(0, lvl * perLevel);
 }
 
 function sendMessageLines(player, lines) {
@@ -329,18 +432,20 @@ function reconcilePlayerInternal(player, source = "interval") {
 	const resolvedLevel = resolveLevel(player, cfg, xpCurrent);
 	if (resolvedLevel !== previousLevel) setScoreBestEffort(player, cfg.levelObjective, resolvedLevel);
 
-	const targets = buildRewardTargets(cfg, resolvedLevel);
-	const previousFortune = Math.max(0, getScoreBestEffort(player, cfg.fortuneObjective) ?? 0);
-	for (const [objective, value] of Object.entries(targets)) {
-		const targetValue = Math.max(0, toInt(value, 0));
-		if (cfg.preserveHigherFortune && objective === cfg.fortuneObjective) {
-			const currentValue = Math.max(0, getScoreBestEffort(player, objective) ?? 0);
-			setScoreBestEffort(player, objective, Math.max(currentValue, targetValue));
-			continue;
-		}
-		setScoreBestEffort(player, objective, targetValue);
+	const previousFortuneFromLevel = getFortuneTargetForLevel(cfg, previousLevel);
+	const nextFortuneFromLevel = getFortuneTargetForLevel(cfg, resolvedLevel);
+	const targetFortune = nextFortuneFromLevel;
+	if (cfg.preserveHigherFortune) {
+		const currentFortune = Math.max(0, getScoreBestEffort(player, cfg.fortuneObjective) ?? 0);
+		setScoreBestEffort(player, cfg.fortuneObjective, Math.max(currentFortune, targetFortune));
+	} else {
+		setScoreBestEffort(player, cfg.fortuneObjective, targetFortune);
 	}
-	const nextFortune = Math.max(0, getScoreBestEffort(player, cfg.fortuneObjective) ?? 0);
+
+	if (resolvedLevel > previousLevel) {
+		const addsMap = buildLevelUpRewardAdds(cfg, previousLevel + 1, resolvedLevel);
+		applyAdditiveRewards(player, addsMap);
+	}
 
 	if (resolvedLevel > previousLevel || (cfg.notifyOnLevelDown && resolvedLevel < previousLevel)) {
 		const nextLevelDef = getLevelDef(cfg, resolvedLevel);
@@ -351,8 +456,9 @@ function reconcilePlayerInternal(player, source = "interval") {
 				NextLevel: toRoman(resolvedLevel),
 				PreviousLevelArabic: previousLevel,
 				NextLevelArabic: resolvedLevel,
-				PreviousFortune: previousFortune,
-				NextFortune: nextFortune,
+				PreviousFortune: previousFortuneFromLevel,
+				NextFortune: nextFortuneFromLevel,
+				ScoreboardAddD: getLevelRewardAmount(nextLevelDef, "D"),
 			},
 			nextLevelDef
 		);

@@ -273,7 +273,7 @@ function resolveXpGain(xpRule, player) {
 	if (!objective) return { gain: base, stat: 0, multiplier: 1 };
 
 	const stat = getScoreBestEffort(player, objective) ?? 0;
-	const multiplier = Math.max(1, Math.trunc(stat / per));
+	const multiplier = Math.max(1, 1 + Math.trunc(stat / per));
 	const gain = Math.max(0, Math.trunc(base * multiplier));
 	return { gain, stat, multiplier };
 }

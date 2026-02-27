@@ -43,7 +43,7 @@ Cada bloque define `modifiers` como array de reglas:
 ## XP gain y progress provisional
 ### Ganancia por evento
 `resolveXpGain` calcula:
-- `multiplier = max(1, floor(stat / stepPerPoints))`
+- `multiplier = max(1, 1 + floor(stat / stepPerPoints))`
 - `xpGain = base * multiplier`
 
 ### Progress provisional para title

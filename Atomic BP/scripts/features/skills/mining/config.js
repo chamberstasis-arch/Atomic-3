@@ -26,6 +26,7 @@ export const miningSkillConfig = {
 	},
 
 	maxLevel: 60,
+	titleColorFallback: "§f",
 
 	// Catálogo explícito de niveles 1..60 (forzado, sin generación automática).
 	levels: [
@@ -45,6 +46,7 @@ export const miningSkillConfig = {
 		{
 			level: 5,
 			xpRequired: 750,
+			titleColor: "§e",
 			scoreboardAddD: 700,
 			rewards: {
 				messageAwards: ["§7[TEST] Nivel 5: override D=700"],
@@ -53,6 +55,7 @@ export const miningSkillConfig = {
 		{
 			level: 6,
 			xpRequired: 1000,
+			titleColor: "§b",
 			scoreboardAddD: 900,
 			rewards: {
 				messageAwards: [
@@ -64,6 +67,7 @@ export const miningSkillConfig = {
 		{
 			level: 7,
 			xpRequired: 1250,
+			titleColor: "§a",
 			scoreboardAddD: 1000,
 			rewards: {
 				messageAwards: [
@@ -76,6 +80,7 @@ export const miningSkillConfig = {
 		{
 			level: 8,
 			xpRequired: 1500,
+			titleColor: "§d",
 			requirements: [{ type: "scoreboardMin", objective: "Acto", min: 2 }],
 			rewards: {
 				messageAwards: ["§7[TEST] Requiere Acto >= 2"],
@@ -84,6 +89,7 @@ export const miningSkillConfig = {
 		{
 			level: 9,
 			xpRequired: 1750,
+			titleColor: "§3",
 			requirements: [{ type: "scoreboardMin", objective: "FamaMin", min: 10 }],
 			scoreboardAddD: 1200,
 			rewards: {
@@ -93,6 +99,7 @@ export const miningSkillConfig = {
 		{
 			level: 10,
 			xpRequired: 2000,
+			titleColor: "§6",
 			scoreboardAdd: { objective: "D", amount: 1500 },
 			rewards: {
 				messageAwards: ["§7[TEST] scoreboardAdd en objeto único"],
@@ -101,6 +108,7 @@ export const miningSkillConfig = {
 		{
 			level: 11,
 			xpRequired: 2250,
+			titleColor: "§c",
 			rewards: {
 				messageAwards: ["§7[TEST] Usa recompensa por rango (sin override)"],
 			},
@@ -108,6 +116,7 @@ export const miningSkillConfig = {
 		{
 			level: 12,
 			xpRequired: 2500,
+			titleColor: "§5",
 			requirements: [{ type: "scoreboardMin", objective: "BossKills", min: 1 }],
 			scoreboardAddD: 2000,
 			rewards: {
@@ -171,7 +180,7 @@ export const miningSkillConfig = {
 		"§s+§3======================§s+",
 		"",
 		"§b§lHABILIDAD MEJORADA§r",
-		"§7Habilidad: §fMineria I",
+		"§7Habilidad: <levelUpMining>",
 		"",
 		"§f>> §bAtributo",
 		"   §6Fortuna §8<PreviousFortune>% §7-> §a<NextFortune>%",

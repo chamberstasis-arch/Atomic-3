@@ -206,7 +206,7 @@ export const skillRegenConfig = {
 		{
 			id: "coal",
 			skill: "mining",
-			blockId: "minecraft:coal_ore",
+			blockId: "minecraft:*coal_ore",
 			// Área(s) habilitadas para este bloque
 			areas: ["A"],
 			// Métrica específica: al minar carbón suma 1 al objective CARBON

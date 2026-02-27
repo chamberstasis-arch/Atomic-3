@@ -114,6 +114,12 @@ function toRoman(value) {
 	return out;
 }
 
+function normalizeTitleColor(value) {
+	const color = asStr(value);
+	if (!color) return "";
+	return /^§[0-9a-f]$/i.test(color) ? color : "";
+}
+
 function normalizeRequirement(req) {
 	if (!req || typeof req !== "object") return null;
 	const type = asStr(req.type).toLowerCase();
@@ -175,7 +181,10 @@ function normalizeLevelEntry(entry, index, maxLevel, options = {}) {
 
 	const requirementsRaw = Array.isArray(entry.requirements) ? entry.requirements : [];
 	const requirements = requirementsRaw.map(normalizeRequirement).filter(Boolean);
-	if (requirementsRaw.length > 0 && requirements.length !== requirementsRaw.length) return null;
+	if (requirementsRaw.length > 0 && requirements.length !== requirementsRaw.length) {
+		requirements.length = 0;
+		requirements.push({ type: "invalidRequirement" });
+	}
 
 	const rewards = entry.rewards && typeof entry.rewards === "object" ? entry.rewards : {};
 	const scoreboardAddsRaw = Array.isArray(rewards.scoreboardAdds) ? rewards.scoreboardAdds : [];
@@ -233,6 +242,7 @@ function normalizeLevelEntry(entry, index, maxLevel, options = {}) {
 		id: asStr(entry.id) || `level_${index + 1}`,
 		level,
 		xpRequired,
+		titleColor: normalizeTitleColor(entry.titleColor),
 		requirements,
 		rewards: {
 			scoreboardAdds: addsMerged,
@@ -285,6 +295,7 @@ function getNormalizedConfig() {
 		levelObjective,
 		fortuneObjective: asStr(cfg?.rewards?.fortuneObjective) || "FortMinPersonalH",
 		fortunePerLevel: toInt(cfg?.rewards?.fortunePerLevel, 4),
+		titleColorFallback: normalizeTitleColor(cfg?.titleColorFallback) || "§f",
 		notifyOnLevelDown: cfg?.runtime?.notifyOnLevelDown === true,
 		preserveHigherFortune: cfg?.runtime?.preserveHigherFortune !== false,
 		levelUpMessage: Array.isArray(cfg?.levelUpMessage) ? cfg.levelUpMessage.map((v) => String(v ?? "")) : [],
@@ -300,6 +311,7 @@ export function getMiningNextXpRequirement(currentLevel = 1) {
 
 function requirementPassed(player, req) {
 	if (!req) return false;
+	if (req.type !== "scoreboardMin") return false;
 	if (req.type === "scoreboardMin") {
 		const score = getScoreBestEffort(player, req.objective);
 		if (score == null) return false;
@@ -322,6 +334,7 @@ function resolveLevel(player, cfg, xpCurrent) {
 	if (!Array.isArray(levels) || levels.length === 0) return 1;
 	let best = 1;
 	for (const entry of levels) {
+		if (xpCurrent < entry.xpRequired) break;
 		if (levelPassed(player, entry, xpCurrent)) best = entry.level;
 		else break;
 	}
@@ -360,6 +373,11 @@ function applyAdditiveRewards(player, addsMap) {
 
 function getLevelDef(cfg, level) {
 	return cfg.levels.find((entry) => entry.level === level) ?? null;
+}
+
+function buildLevelUpMiningLabel(cfg, levelDef, levelNumber) {
+	const color = normalizeTitleColor(levelDef?.titleColor) || cfg?.titleColorFallback || "§f";
+	return `${color}Mineria ${toRoman(levelNumber)}§r`;
 }
 
 function renderLevelChangeMessage(cfg, payload, levelDef) {
@@ -452,6 +470,7 @@ function reconcilePlayerInternal(player, source = "interval") {
 		const lines = renderLevelChangeMessage(
 			cfg,
 			{
+				levelUpMining: buildLevelUpMiningLabel(cfg, nextLevelDef, resolvedLevel),
 				PreviousLevel: toRoman(previousLevel),
 				NextLevel: toRoman(resolvedLevel),
 				PreviousLevelArabic: previousLevel,

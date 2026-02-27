@@ -18,3 +18,5 @@ Los Siete se fragmentaron tras la guerra, no muertos pero si vagando por el mund
 "Y eso fue hace 500 años, de allá para aca... han pasado inumerables tragedias, el mundo se fue a gris, el humano dejo de prosperar y entonces llego al punto de extinción."
 
 "Por eso; podrías ser el único aquí, o simplemente el último."
+
+Sin inmutarte no le diste importancia y bajo la luz del sol empuñaste tu palo

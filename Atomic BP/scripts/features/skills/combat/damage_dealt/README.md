@@ -4,7 +4,7 @@ Ruta: `Atomic BP/scripts/features/skills/combat/damage_dealt`
 
 Este feature aplica el **daño real** a la vida custom (`Vida`, scoreboard) cuando ocurre un golpe melee.
 
-No recalcula lore ni stats: **consume** los scoreboards ya calculados por `skills/calc` y deja que `combat/health` se encargue de sincronizar `Vida` con corazones vanilla.
+No recalcula lore ni stats: **consume** los scoreboards ya calculados por `skills/combat/calc` y deja que `combat/health` se encargue de sincronizar `Vida` con corazones vanilla.
 
 ---
 
@@ -38,17 +38,17 @@ No-alcances (por ahora):
 
 - Proyectiles, magia, tridentes, TNT, etc. (MVP usa solo melee).
 - UI/feedback visual (eso vive en `damage_title/`; aquí solo se dejan hooks).
-- Recalcular stats del arma/armadura en el golpe (eso es `skills/calc`).
+- Recalcular stats del arma/armadura en el golpe (eso es `skills/combat/calc`).
 
 ---
 
 ## Dependencias y cómo encaja con lo ya implementado
 
-### `skills/calc` (fuente de verdad del daño)
+### `skills/combat/calc` (fuente de verdad del daño)
 
 Este feature consume scoreboards calculados por:
 
-`Atomic BP/scripts/features/skills/calc`
+`Atomic BP/scripts/features/skills/combat/calc`
 
 Scoreboards relevantes (IDs ASCII):
 
@@ -59,7 +59,7 @@ Scoreboards relevantes (IDs ASCII):
 - Objetivo (entidad):
 	- `DtotalH` (int) — defensa total (si falta, 0)
 
-Nota: `skills/calc` también calcula vida máxima total (`VidaMaxTotalH`), pero este feature NO la usa directamente.
+Nota: este feature no calcula ni inicializa `VidaMaxTotalH`; solo consume los outputs que ya llegan desde el pipeline de combate.
 
 ### `combat/health` (vida custom + display)
 
@@ -113,7 +113,7 @@ Vida aplicada:
 
 - `Vida` (dummy): vida actual custom del objetivo.
 
-Inputs (por `skills/calc`):
+Inputs (por `skills/combat/calc`):
 
 - Atacante jugador:
 	- `DanoFinalSC`
@@ -297,8 +297,8 @@ Resultado:
 - Si faltan scores como `DtotalH` => tratar como 0.
 - Si faltan scores como `DanoFinalSC/DanoFinalCC` => tratar como 0.
 - Si `Vida` no existe en el objetivo:
-	- MVP recomendado: tratar como 0 y escribirlo solo si se decidió habilitar auto-init.
-	- Alternativa: early-exit (configurable) para no “ensuciar” entidades que no están en el sistema.
+	- Recomendado: tratar como 0 o hacer early-exit según la política del módulo.
+	- No crear objectives ni auto-init de scoreboards desde este feature; la existencia del objective debe venir de `scripts/scoreboards/`.
 
 ---
 

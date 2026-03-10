@@ -1,6 +1,16 @@
-# Plan de Centralización — skills/
+# Plan de Centralizacion — skills/
 
 > Minecraft Bedrock 1.21.132 · `@minecraft/server` 2.4.0
+
+> Estado del documento: referencia historica y tecnica.
+>
+> Este archivo ya no es el documento rector de `skills/`. Se conserva porque contiene contexto tecnico util, riesgos detectados y decisiones de centralizacion, pero si entra en conflicto con documentos mas nuevos deben prevalecer:
+>
+> 1. `MIGRACION_CORE_SKILLS.md`
+> 2. `core/README.md`
+> 3. La documentacion vigente de cada modulo consumidor o motor global
+>
+> En otras palabras: `Centralizacion.md` ya no define por si solo la arquitectura actual; hoy funciona como referencia de transicion y archivo de apoyo para la migracion.
 
 Documento de diseño para la reestructuración del directorio `Atomic BP/scripts/features/skills/`. Define los cambios arquitectónicos, el nuevo modelo de scoreboards y el plan de migración.
 
@@ -32,6 +42,8 @@ La lectura de estadísticas del lore y la escritura de scoreboards están disper
 3. **Mover `calc/` dentro de `combat/`** para reflejar que las fórmulas de daño son parte del sistema de combate.
 4. **Refactorizar `calc/` y `combat/`** para que consuman datos producidos por `lecture/` en vez de parsear lore directamente.
 5. **Facilitar la extensión**: agregar una nueva estadística debe requerir solo una entrada en el registro, sin tocar lógica de parsing ni de cálculo.
+6. **Preparar un `skills/core/` reutilizable** para progreso, niveles, recompensas y mensajes de skills no-combate.
+7. **Evitar que los módulos de skills creen objectives** fuera de `scripts/scoreboards/`.
 
 ---
 
@@ -40,7 +52,16 @@ La lectura de estadísticas del lore y la escritura de scoreboards están disper
 ```text
 skills/
   Centralizacion.md          ← Este documento
+  MIGRACION_CORE_SKILLS.md   ← Documento rector de migración vigente
   README.md                  ← Índice general de skills (existente)
+  core/                      ← NUEVO: progreso compartido de skills
+    README.md
+    index.js
+    registry.js
+    progression.js
+    rewards.js
+    titles.js
+    scoreboards.js
   lecture/                   ← NUEVO: lectura centralizada de lore
     README.md
     index.js                 ← Entry-point: initLecture(); loop de lectura
@@ -381,7 +402,7 @@ calc/ aplica fórmula y escribe:  DanoFinalSC, DanoFinalCC
 
 1. Crear `skills/lecture/` con `statRegistry.js`, `loreParser.js` (ampliado), `equipmentReader.js` (copiado de calc/), `totals.js` y `index.js`.
 2. El parser genérico itera sobre `STAT_REGISTRY` en vez de tener bloques hardcodeados por stat.
-3. Registrar los 72 scoreboards nuevos (18 stats × 4 capas) en `scoreboards/catalog.js`. **Toda inicialización de objectives se realiza exclusivamente en `scoreboards/catalog.js`** (ver §9).
+3. Registrar los 72 scoreboards nuevos (18 stats × 4 capas) en `scoreboards/catalog.js`. **Toda inicialización de objectives se realiza exclusivamente en `scoreboards/catalog.js`** y se materializa por `scoreboards/init.js` (ver §9).
 4. Inicializar `lecture/` desde `main.js`.
 5. Verificar que los scoreboards de Equipamiento y Total se escriben correctamente.
 
@@ -417,6 +438,23 @@ calc/ aplica fórmula y escribe:  DanoFinalSC, DanoFinalCC
 3. Remover scoreboards obsoletos de `catalog.js`.
 
 ### Fase 4: Adaptar consumidores
+
+### Fase 4.1: Crear `skills/core/`
+
+Antes de extender mineria a tala o cosecha, debe existir un `core/` con responsabilidades acotadas:
+
+- Resolver progreso por `skillId`.
+- Calcular siguiente requisito de XP.
+- Reconciliar rewards por nivel.
+- Exponer hooks reutilizables para scoreboards aplicados desde `regeneration/`.
+
+Este paso es el que evita copiar `mining/` hacia `foraging/`.
+
+### Fase 4.2: Desacoplar `regeneration/` de `mining/`
+
+- Reemplazar imports directos de helpers de mineria por helpers del core.
+- El progreso visual debe consultar el core por `skillId`.
+- Queda prohibido seguir agregando logica comun de skills dentro de `mining/`.
 
 #### `combat/calc/`
 
@@ -457,9 +495,9 @@ Sin cambios directos de scoreboards. Revisar que no haya lecturas hardcodeadas d
 
 #### Consumidores fuera de `combat/`
 
-1. `skills/mining/`: consumir `FortMinTotalH`, `ExpMinTotalH` de scoreboards producidos por `lecture/`.
-2. `skills/farming/`: consumir `FortCosTotalH`, `MutActTotalH`, `ExpCosTotalH`.
-3. `skills/foraging/`: consumir `FortTalTotalH`, `FrenTalTotalH`, `ExpTalTotalH`.
+1. `skills/mining/`: consumir `FortMinTotalH`, `ExpMinTotalH` de scoreboards producidos por `lecture/` y delegar progreso al `core/`.
+2. `skills/farming/`: consumir `FortCosTotalH`, `MutActTotalH`, `ExpCosTotalH` y delegar progreso al `core/`.
+3. `skills/foraging/`: consumir `FortTalTotalH`, `FrenTalTotalH`, `ExpTalTotalH`, usar `regeneration/` para spread y delegar progreso al `core/`.
 
 ---
 
@@ -489,6 +527,7 @@ Cache de equipamiento:
 ## 9. Compatibilidad y restricciones
 
 - **Inicialización centralizada de scoreboards**: todos los objectives se definen y registran **exclusivamente** en `Atomic BP/scripts/scoreboards/catalog.js`. Ningún módulo debe crear o inicializar objectives por su cuenta; solo consume los que `catalog.js` registra al arranque del mundo. Esto incluye los 72 scoreboards del modelo de 4 capas, los scoreboards auxiliares de combate (`DanoFinalSC`, `DanoFinalCC`, etc.) y cualquier otro objective del proyecto.
+- **`skills/core/` también está sujeto a esta regla**: aunque concentre lógica de progreso, no puede crear objectives ni inicializaciones alternativas.
 - **Solo Script API estable** (`@minecraft/server` 2.4.0). Sin APIs experimentales.
 - **Sin dynamic properties**: bajo ninguna circunstancia se almacenan estadísticas, cache persistente ni estado de jugador en dynamic properties de entidad o mundo. Todo el estado numérico va en scoreboards; todo el estado transitorio va en `Map` en memoria (se pierde al recargar el mundo, se reconstruye en el siguiente tick).
 - **IDs ASCII** para scoreboards y archivos (sin ñ, acentos ni caracteres especiales).
@@ -711,3 +750,116 @@ Durante la migración (especialmente Fase 3: scoreboards legacy), los jugadores 
 - No eliminar scoreboards legacy hasta verificar que los nuevos funcionan correctamente.
 - Implementar un periodo de convivencia donde ambos IDs coexistan (el nuevo lee del nuevo, pero si es 0 hace fallback al legacy).
 - Documentar en un script de migración (`tools/migrateScoreboards.js`) que copie valores legacy a los nuevos IDs.
+
+---
+
+## 12. Responsabilidades validadas por modulo
+
+Esta tabla resume la direccion arquitectonica que debe respetarse despues de la migracion:
+
+| Modulo | Responsabilidad principal | No debe hacer |
+|---|---|---|
+| `scoreboards/` | Catalogar e inicializar objectives | Resolver gameplay de skills |
+| `lecture/` | Leer lore y escribir capas Equipamiento/Total | Resolver niveles o drops |
+| `regeneration/` | Resolver bloques, drops, XP por evento y spread | Resolver progreso especifico de mineria |
+| `core/` | Resolver XP, nivel, rewards y payload comun | Crear objectives o parsear lore |
+| `mining/` | Declarar catalogo y presentation layer de mineria | Servir como motor comun de otras skills |
+| `foraging/` | Declarar catalogo y presentation layer de tala | Implementar spread o parser por su cuenta |
+| `farming/` | Declarar catalogo y presentation layer de cosecha | Duplicar logica del core |
+
+---
+
+## 13. Casos de uso a validar
+
+### Caso 1. Jugador nuevo entra al mundo
+
+- Los objectives ya deben existir por `initAllScoreboards()`.
+- `lecture/` puede leer equipo cuando corresponda.
+- `core/` debe resolver nivel base sin crear scoreboards dinamicamente.
+
+### Caso 2. Jugador mina un bloque valido
+
+- `regeneration/` aplica XP y drops.
+- `core/` recalcula nivel de mineria.
+- `mining/` compone recompensa y mensaje.
+
+### Caso 3. Jugador tala logs validos
+
+- `regeneration/` aplica XP y drops de tala.
+- El spread se resuelve como mecanica global si `FrenTalTotalH` lo permite.
+- `core/` recalcula nivel de tala.
+- `foraging/` resuelve su presentation layer.
+
+### Caso 4. Jugador cambia de equipamiento
+
+- `lecture/` actualiza totals.
+- Las skills consumidoras ven el cambio en el siguiente evento valido.
+
+### Caso 5. Admin modifica XP o nivel por comando
+
+- `core/` debe reconciliar rewards persistentes sin dejar desincronizaciones.
+
+---
+
+## 14. Pruebas manuales en Minecraft
+
+### Pruebas de inicializacion
+
+1. Entrar a un mundo nuevo con el BP activo.
+  Resultado esperado:
+  los objectives oficiales de skills existen antes de usar las features.
+
+2. Reiniciar el mundo.
+  Resultado esperado:
+  los objectives siguen disponibles y no dependen de inicializacion tardia dentro de skills.
+
+### Pruebas de lecture
+
+1. Equipar item con stats de mineria, tala y cosecha.
+  Resultado esperado:
+  los scoreboards `*TotalH` cambian segun el lore.
+
+2. Quitar el item.
+  Resultado esperado:
+  los totals vuelven al valor personal + otros.
+
+### Pruebas de progression core
+
+1. Otorgar XP manualmente a una skill.
+  Resultado esperado:
+  el nivel se recalcula correctamente.
+
+2. Reducir XP manualmente.
+  Resultado esperado:
+  la reward persistente se reconcilia hacia abajo.
+
+### Pruebas de foraging
+
+1. Talar un log con fortuna de tala 0.
+  Resultado esperado:
+  drops base.
+
+2. Talar con frenesi 120.
+  Resultado esperado:
+  un extra garantizado y opcion del siguiente por 20%.
+
+3. Talar en estructura compacta con frenesi alto.
+  Resultado esperado:
+  el spread sigue vecinos ortogonales, no diagonales.
+
+### Pruebas multijugador
+
+1. Dos jugadores usan skills distintas en paralelo.
+  Resultado esperado:
+  no se mezclan XP, niveles ni rewards.
+
+---
+
+## 15. Direccion documental vigente
+
+La interpretacion correcta de la documentacion de skills queda asi:
+
+- `Centralizacion.md`: arquitectura tecnica amplia y contexto historico de la centralizacion.
+- `MIGRACION_CORE_SKILLS.md`: documento rector vigente de la reestructura hacia `core/`.
+- `core/README.md`: contrato funcional del motor compartido.
+- `mining/MINING.md`, `foraging/README.md` y futuros documentos por skill: especificaciones consumidoras sobre el core.

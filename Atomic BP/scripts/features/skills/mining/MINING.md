@@ -44,6 +44,8 @@ Para esta feature se oficializan estos objetivos:
 - SkillXpMineria: XP acumulada total de minería.
 - SkillLvlMineria: nivel actual de minería.
 
+Estos objectives deben existir por medio de `scripts/scoreboards/catalog.js` + `initAllScoreboards()`. `mining/` no debe crearlos por su cuenta.
+
 
 ## 4) Reglas funcionales de nivelado
 
@@ -286,7 +288,7 @@ Esto permite que mining levels sea independiente de la lógica de drops/regenera
 ## 10) Casos borde obligatorios
 
 - Jugador nuevo sin entradas previas: inicializar XP=0 y Level=1.
-- Scoreboard inexistente: crear/asegurar objetivo antes de operar.
+- Scoreboard inexistente en runtime: tratarlo como error de integración o de catálogo. La solución correcta es declararlo en `scripts/scoreboards/`, no crearlo desde `mining/`.
 - XP negativa por error externo: clamp mínimo a 0.
 - Niveles mal configurados: desactivar subida y loggear warning de configuración.
 - Requisitos extra no válidos: ignorar ese nivel y registrar warning.

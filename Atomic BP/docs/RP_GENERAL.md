@@ -1,7 +1,7 @@
 # Atomic RP — Documentación general
 
 ## Propósito
-Resource Pack (RP) para Minecraft Bedrock (1.21.131) enfocado en render, UI y assets que soportan los sistemas del BP.
+Resource Pack (RP) para Minecraft Bedrock (1.21.132) enfocado en render, UI y assets que soportan los sistemas del BP.
 
 ## Compatibilidad y versiones
 - **min_engine_version**: 1.21.0 en el manifest del RP.

@@ -1,7 +1,7 @@
 # Atomic BP — Documentación general
 
 ## Propósito
-Behavior Pack (BP) para Minecraft Bedrock (1.21.131) enfocado en ambientación, utilidades y sistemas de servidor/realm. Incluye scripts, funciones y entidades que extienden la jugabilidad.
+Behavior Pack (BP) para Minecraft Bedrock (1.21.132) enfocado en ambientación, utilidades y sistemas de servidor/realm. Incluye scripts, funciones y entidades que extienden la jugabilidad.
 
 ## Compatibilidad y versiones
 - **min_engine_version**: 1.21.93 en el manifest del BP.

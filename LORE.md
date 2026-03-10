@@ -19,4 +19,4 @@ Los Siete se fragmentaron tras la guerra, no muertos pero si vagando por el mund
 
 "Por eso; podrías ser el único aquí, o simplemente el último."
 
-Sin inmutarte no le diste importancia y bajo la luz del sol empuñaste tu palo
+Sin inmutarte no le diste importancia y bajo la luz del sol empuñaste tu palo y golpeaste un arbol en busqueda de madera

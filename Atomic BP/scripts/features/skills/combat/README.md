@@ -60,7 +60,8 @@ skills/
     defense/                  ← (Pendiente) Reducción de daño por defensa en mobs
       README.md
   lecture/                    ← Centralización de lectura de lore + escritura de *TotalH
-  Centralizacion.md           ← Plan de reestructuración de skills/
+  MIGRACION_CORE_SKILLS.md    ← Documento rector vigente de migración
+  Centralizacion.md           ← Referencia histórica/técnica de centralización
   farming/
   fishing/
   foraging/
@@ -131,14 +132,14 @@ Aplica a:
 
 Cada estadística se descompone en cuatro capas aditivas.
 
-> **Estado actual vs planificado**: hoy se usan scoreboards como `DMGH` (personal) y `DtotalH` (total). La nomenclatura se migrará a la convención `<Stat><Capa>H` descrita aquí. Ver [Centralizacion.md](../Centralizacion.md) para el plan de migración.
+> **Estado actual vs migración**: el combate todavía consume algunos outputs legacy como `ProbabilidadCriticaTotal`, `DtotalH` y `MtotalH`, pero la lectura de lore ya está centralizada en `lecture/`. La dirección vigente hacia `skills/core/` está documentada en [MIGRACION_CORE_SKILLS.md](../MIGRACION_CORE_SKILLS.md).
 
 | Capa | Scoreboard planificado (ej: Daño) | Scoreboard actual (ej: Daño) | Fuente | Mutabilidad |
 |---|---|---|---|---|
 | **Personal** | `DanoPersonalH` | `DMGH` | Scoreboard editable del jugador | Editable por comandos/scripts |
 | **Equipamiento** | `DanoEquipamientoH` | *(calculado en memoria)* | Suma del valor Total del lore de los 6 slots | Recalculado automáticamente |
 | **Otros** | `DanoOtrosH` | *(no existe aún)* | Buffs, efectos, habilidades temporales | Escrito por sistemas externos |
-| **Total** | `DanoTotalH` | `DanoFinalSC` / `DtotalH` | `Personal + Equipamiento + Otros` | Calculado; solo lectura |
+| **Total** | `DanoTotalH` | `DanoTotalH` | `Personal + Equipamiento + Otros` | Calculado; solo lectura |
 
 $$
 Total = Personal + Equipamiento + Otros
@@ -169,7 +170,7 @@ Todas siguen la convención Personal/Equipamiento/Otros/Total:
 | Mutación Activa | float | `Mutación Activa:` |
 | Experiencia de Cosecha | int | `Experiencia de Cosecha:` |
 
-> Las estadísticas de minería, tala y cosecha son consumidas por `skills/mining/`, `skills/foraging/` y `skills/farming/` respectivamente, pero la **lectura del lore** se centraliza en `calc/` (y a futuro en `lecture/`).
+> Las estadísticas de minería, tala y cosecha son consumidas por `skills/mining/`, `skills/foraging/` y `skills/farming/` respectivamente, pero la **lectura del lore** ya está centralizada en `lecture/`.
 
 ### 3.3 Equipamiento leído
 
@@ -200,7 +201,7 @@ Detalles completos en [combat/calc/README.md](calc/README.md).
 **Salidas**: `DanoFinalSC`, `DanoFinalCC`, `ProbabilidadCriticaTotal`, `DtotalH`, `MtotalH`.
 
 Optimizaciones implementadas:
-- **Cache por firma de equipo**: solo recalcula si cambió el item (typeId + nameTag + lore) o las stats base.
+- **Cache por jugador e inputs relevantes**: solo recalcula cuando cambian los totals o entradas relevantes consumidas por el calculador.
 - **Escritura condicional**: solo actualiza scoreboards si el valor calculado difiere del anterior.
 - **Early-exit**: si `H != 1`, pone salidas a 0 y continúa.
 
@@ -211,7 +212,7 @@ Sistema de vida alternativo basado en los scoreboards `Vida` y `VidaMaxTotalH`, 
 Scoreboards clave:
 - `Vida`: vida actual (clamped a `0..VidaMaxTotalH`).
 - `VidaMaxH`: vida máxima base/personal (inicializada a 100 la primera vez).
-- `VidaMaxTotalH`: vida máxima total (`VidaMaxH + VidaGear`), calculada por `calc/`.
+- `VidaMaxTotalH`: vida máxima total, escrita por `lecture/` dentro del modelo por capas.
 - `VidaAbsorcion`: escudo temporal (manzanas de oro). Se consume antes que `Vida`.
 - `HDead`: flag interno de muerte lógica.
 
@@ -348,10 +349,10 @@ DañoBaseFinal = (1 + DañoTotal) \times (1 + \frac{Poder}{10}) \times MA \times
 $$
 
 Donde:
-- `DañoTotal` = stat base del jugador + suma de daño del equipamiento.
-- `Poder` = stat de poder del equipamiento (default 0).
-- `MA` = `MAH / 10` (Multiplicador Aditivo; default 1.0).
-- `MM` = `MMH / 10` (Multiplicador Multiplicativo; default 1.0).
+- `DañoTotal` = `DanoTotalH`.
+- `Poder` = `PoderTotalH` o 0 si el sistema aún no lo conecta a la fórmula.
+- `MA` = `MATotalH / 10`.
+- `MM` = `MMTotalH / 10`.
 - `Bonus` = bonus plano (default 0).
 
 Protecciones: si `MA` o `MM` son 0, `NaN` o `undefined`, se tratan como 1.
@@ -427,7 +428,7 @@ Existe `skills/lecture/` como módulo dedicado exclusivamente a la **lectura cen
 
 Responsabilidades de `lecture/`:
 - Lectura de los 6 slots de equipamiento.
-- Parsing de todas las estadísticas del lore (las 16 listadas en §3.2).
+- Parsing de todas las estadísticas del lore documentadas para skills y combate.
 - Escritura de los scoreboards de capa **Equipamiento** (ej. `DanoEquipamientoH`) y los **Totales** `*TotalH`.
 
 Responsabilidades que **permanecen** en `combat/calc/`:
@@ -447,7 +448,7 @@ DanoOtrosH          ← Escrito por efectos, buffs, etc.
 DanoTotalH          ← Suma de las tres capas anteriores
 ```
 
-Esto reemplazará gradualmente los scoreboards actuales (`DMGH`, `DanoFinalSC`, etc.) con una nomenclatura uniforme.
+Esto reemplaza gradualmente los scoreboards base legacy (`DMGH`, `CDH`, `CCH`, `DH`, `MH`) con una nomenclatura uniforme, manteniendo outputs legacy de `combat/calc/` mientras existan consumidores de compatibilidad.
 
 ---
 
@@ -505,7 +506,7 @@ const EFFECT_DEFINITIONS = {
 ### 10.4 Rendimiento
 
 - **Un solo interval para cálculo** (ya implementado). No crear intervals por jugador.
-- **Firma de equipamiento para cache** (`typeId|nameTag|lore.join`): recalcular solo cuando la firma cambie.
+- **Cache coherente con lecture**: si se usa una firma de equipamiento, debe producirla `lecture/` o derivarse de sus totals; `combat/calc/` no debe volver a leer equipo por su cuenta.
 - **Evitar `getPlayers()` repetido**: llamar una vez por tick y reutilizar el array.
 - **Batch de escrituras**: si se implementa `lecture/` como módulo separado, estructurar el pipeline para que una sola pasada por jugador lea todo y escriba todo, en vez de múltiples pasadas.
 - **No spawnear entidades en loops de alta frecuencia**: los hologramas solo se crean en eventos puntuales (golpes, ticks de efecto), nunca en el loop de cálculo.

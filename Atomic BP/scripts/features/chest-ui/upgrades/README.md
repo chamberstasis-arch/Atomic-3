@@ -30,8 +30,8 @@ Este documento define la especificación funcional y de datos del sistema de “
 
 Para lectura tolerante del lore, seguir el estilo de:
 
-- `Atomic BP/scripts/features/skills/calc/equipmentReader.js`
-- `Atomic BP/scripts/features/skills/calc/loreParser.js`
+- `Atomic BP/scripts/features/skills/lecture/equipmentReader.js`
+- `Atomic BP/scripts/features/skills/lecture/loreParser.js`
 
 Pautas consideradas estándar en el repo:
 
@@ -56,7 +56,7 @@ Responsabilidades esperadas:
     - Acciones concretas (modificar lore, confirmar, aplicar).
     - Al terminar, regresan y fuerzan refresh del menú principal.
 
-Nota: se trabajará solo dentro de `chest-ui/` salvo tomar referencia de lectura/parsing en `skills/calc`.
+Nota: se trabajará solo dentro de `chest-ui/` salvo tomar referencia de lectura/parsing en `skills/lecture`.
 
 ## 4) Items custom (clones) y visualización en la Chest UI
 
@@ -674,7 +674,7 @@ Ejemplo de omisión de canal (faltando S1):
 
 ## 9) Reglas de parsing (tolerancia y compatibilidad)
 
-Inspirado en `skills/calc/loreParser.js`:
+Inspirado en `skills/lecture/loreParser.js`:
 
 1. Strip de formato: eliminar `§.` antes de normalizar.
 2. Normalización: compactar espacios múltiples, trim.
@@ -785,7 +785,7 @@ Para facilitar pruebas sin comandos extra:
 
 ## 14) Recomendación: configuración data-driven (tipo `config.js`)
 
-Para evitar hardcodeo y simplificar futuras variantes, se recomienda definir una configuración en un módulo tipo `config.js`, similar al patrón usado en `skills/calc/config.js`.
+Para evitar hardcodeo y simplificar futuras variantes, se recomienda definir una configuración en un módulo tipo `config.js`, similar al patrón usado en `skills/combat/calc/config.js`.
 
 Objetivo:
 

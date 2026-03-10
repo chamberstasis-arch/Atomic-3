@@ -47,18 +47,18 @@ Motivo:
   - `ac_ban_sanction`
 - Config: [Atomic BP/scripts/features/anticheat/anticheat.config.js](Atomic%20BP/scripts/features/anticheat/anticheat.config.js)
 
-### Skills / Calc (daño y stats)
-- Init dedicado: [Atomic BP/scripts/features/skills/calc/scoreInit.js](Atomic%20BP/scripts/features/skills/calc/scoreInit.js)
+### Skills / Combat Calc + Lecture (daño y stats)
+- Ruta actual del calculador: [Atomic BP/scripts/features/skills/combat/calc/README.md](Atomic%20BP/scripts/features/skills/combat/calc/README.md)
+- Lectura centralizada de lore: [Atomic BP/scripts/features/skills/lecture](Atomic%20BP/scripts/features/skills/lecture)
 - Estado: **call comentado** en [Atomic BP/scripts/main.js](Atomic%20BP/scripts/main.js)
-- Refuerzo adicional (ensure en runtime): [Atomic BP/scripts/features/skills/calc/index.js](Atomic%20BP/scripts/features/skills/calc/index.js)
-- Estado: **bloques de ensure comentados** (migrado a init central)
+- Refuerzo adicional histórico: ahora debe considerarse migrado al init central y a los módulos vigentes de `combat/calc` + `lecture/`
 - Objectives (desde config):
   - `H`
   - `DMGH`, `CDH`, `CCH`, `DH`, `MH`, `VidaMaxH`
   - `MAH`, `MMH`
   - `DanoFinalSC`, `DanoFinalCC`, `ProbabilidadCriticaTotal`
   - `DtotalH`, `MtotalH`, `VidaMaxTotalH`
-- Config: [Atomic BP/scripts/features/skills/calc/config.js](Atomic%20BP/scripts/features/skills/calc/config.js)
+- Config: [Atomic BP/scripts/features/skills/combat/calc/config.js](Atomic%20BP/scripts/features/skills/combat/calc/config.js)
 
 ### Combat / Health
 - Init: [Atomic BP/scripts/features/skills/combat/health/scoreboards.js](Atomic%20BP/scripts/features/skills/combat/health/scoreboards.js)

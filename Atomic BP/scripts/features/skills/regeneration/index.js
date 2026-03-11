@@ -18,9 +18,10 @@ import {
 	selectActiveModifier,
 } from "./modifiers.js";
 import { runDropsTable } from "./drops.js";
+import { resolveSpreadTargets } from "./spread.js";
 import { validateMiningRegenConfig } from "./validate.js";
 import { upsertTemporaryTitle } from "../../../systems/titlesPriority/index.js";
-import { getMiningNextXpRequirement, onSkillScoreboardsApplied } from "../mining/index.js";
+import { getSkillDefinition, getSkillNextXpRequirement, onSkillScoreboardsApplied } from "../core/index.js";
 import {
 	computeRemainingTicks,
 	initSkillRegenDynamicProperties,
@@ -117,16 +118,9 @@ function getSkillProgressObjectiveIds(config, skill, xpRule) {
 	const bySkill = config?.runtime?.titles?.progressObjectivesBySkill;
 	const key = normalizeSkillId(skill);
 	const runtimeSkill = bySkill && typeof bySkill === "object" ? bySkill[key] : null;
-
-	const fallbackBySkill = {
-		mining: { xp: "SkillXpMineria", level: "SkillLvlMineria" },
-		foraging: { xp: "SkillXpTala", level: "SkillLvlTala" },
-		farming: { xp: "SkillXpCosecha", level: "SkillLvlCosecha" },
-	};
-
-	const fallback = fallbackBySkill[key] || null;
-	const xpObjective = String(xpRule?.gainObjective ?? runtimeSkill?.xp ?? fallback?.xp ?? "").trim();
-	const levelObjective = String(xpRule?.levelObjective ?? runtimeSkill?.level ?? fallback?.level ?? "").trim();
+	const coreSkill = getSkillDefinition(key);
+	const xpObjective = String(xpRule?.gainObjective ?? runtimeSkill?.xp ?? coreSkill?.xpObjective ?? "").trim();
+	const levelObjective = String(xpRule?.levelObjective ?? runtimeSkill?.level ?? coreSkill?.levelObjective ?? "").trim();
 	return { xpObjective, levelObjective };
 }
 
@@ -144,7 +138,7 @@ function buildXpTitlePayload(config, player, blockDef, xpRule, xpGain) {
 	const currentXp = objectiveIds.xpObjective ? (getScoreBestEffort(player, objectiveIds.xpObjective) ?? 0) : 0;
 	const currentLevel = objectiveIds.levelObjective ? (getScoreBestEffort(player, objectiveIds.levelObjective) ?? 0) : 0;
 	const xpActual = Math.max(0, currentXp + gain);
-	const requirementFromCatalog = skill === "mining" ? Number(getMiningNextXpRequirement(currentLevel)) : NaN;
+	const requirementFromCatalog = Number(getSkillNextXpRequirement(skill, currentLevel));
 	const hasLevelRequirement = Number.isFinite(requirementFromCatalog) && requirementFromCatalog > 0;
 	const xpRequeriment = hasLevelRequirement ? Math.trunc(requirementFromCatalog) : 0;
 
@@ -652,6 +646,127 @@ export function initMiningRegen(userConfig) {
 		return true;
 	}
 
+	function processResolvedBlockBreak({ player, dim, dimensionId, blockPos, originalBlockTypeId, blockDef, key, isTargetTrace = false, allowSpread = false }) {
+		try {
+			if (!config || !config.enabled) return false;
+			if (isCreativeBestEffort(player)) return false;
+
+			const current = getBlockTypeIdSafe(dim, blockPos);
+			if (current !== originalBlockTypeId) {
+				if (isTargetTrace) tell(player, `§c[mining] abort: bloque cambió (${current})`);
+				return false;
+			}
+
+			const didSetMinedState = setBlockTypeSafe(dim, blockPos, blockDef.minedBlockId);
+			if (!didSetMinedState) {
+				dbg(config, `No se pudo setear minedState=${blockDef.minedBlockId} en ${key}`);
+				if (isTargetTrace) tell(player, "§c[mining] mined-state FAIL (no se puede aplicar)");
+				return false;
+			}
+			if (isTargetTrace) tell(player, "§a[mining] mined-state=ok");
+
+			let selected = selectActiveModifier(blockDef, {
+				player,
+				blockDef,
+				dimensionId,
+				blockPos,
+				areas: Array.isArray(config?.areas) ? config.areas : [],
+			});
+
+			if (!selected && blockDef.fortuneTiers) {
+				selected = resolveFortuneResult(blockDef.fortuneTiers, player);
+			}
+
+			const dropsTable = resolveDropsTable(blockDef, selected);
+
+			try {
+				const triggerKeys = getParticleTriggerModifierKeys(config);
+				if (selected && triggerKeys.includes(String(selected.key))) {
+					const p = blockDef && blockDef.particlesOnSilkTouch && typeof blockDef.particlesOnSilkTouch === "object" ? blockDef.particlesOnSilkTouch : null;
+					if (p && typeof p.fn === "function") {
+						const off = p.offset || { x: 0.5, y: 0.5, z: 0.5 };
+						p.fn(dim, { x: blockPos.x + off.x, y: blockPos.y + off.y, z: blockPos.z + off.z }, p.options);
+					}
+				}
+			} catch (e) {
+				void e;
+			}
+
+			const spawned = runDropsTable(dim, blockPos, dropsTable);
+			spawnXpOrbsBestEffort(config, dim, blockPos, blockDef);
+			if (debugTellPlayer(config)) tell(player, `§7[mining] drops=${spawned} skill=${blockDef.skill} regen=${blockDef.regenSeconds}s`);
+
+			const globalAdds = metricsEnabled(config) ? getScoreboardAddsOnBreak(config) : null;
+			const blockAdds = blockDef && blockDef.scoreboardAddsOnBreak && typeof blockDef.scoreboardAddsOnBreak === "object" ? blockDef.scoreboardAddsOnBreak : null;
+			const modifierAdds = getModifierScoreboardAdds(selected);
+
+			let xpAdds = null;
+			const xpRule = getModifierXpRule(selected)
+				?? (blockDef?.xp && typeof blockDef.xp === "object" ? blockDef.xp : null);
+			const xpGain = resolveXpGain(xpRule, player);
+			if (xpRule && xpGain && xpGain.gain > 0) {
+				const gainObjective = String(xpRule.gainObjective ?? "").trim();
+				if (gainObjective) xpAdds = { [gainObjective]: xpGain.gain };
+				emitXpTitleBestEffort(config, player, blockDef, selected, xpRule, xpGain);
+			}
+
+			const merged = mergeScoreboardAdds(mergeScoreboardAdds(mergeScoreboardAdds(globalAdds, blockAdds), modifierAdds), xpAdds);
+			if (merged) {
+				applyScoreboardAddsBestEffort(config, dim, player, merged);
+				onSkillScoreboardsApplied(normalizeSkillId(blockDef?.skill), player, merged);
+			}
+
+			addPending({
+				dimensionId,
+				x: blockPos.x,
+				y: blockPos.y,
+				z: blockPos.z,
+				blockId: originalBlockTypeId,
+				minedBlockId: blockDef.minedBlockId,
+				restoreAt: nowMs() + blockDef.regenSeconds * 1000,
+			});
+
+			if (allowSpread) {
+				const spreadTargets = resolveSpreadTargets({
+					player,
+					dimension: dim,
+					dimensionId,
+					originPos: blockPos,
+					originBlockTypeId: originalBlockTypeId,
+					blockDef,
+					registry,
+					areas: Array.isArray(config?.areas) ? config.areas : [],
+					spreadDefaults: config?.runtime?.spread,
+					pendingByKey,
+					processingKeys,
+					getScoreBestEffort,
+					getBlockTypeIdSafe,
+					makeKeyFromPos,
+					isInAnyArea,
+					getBlockDefinition,
+				});
+
+				for (const target of spreadTargets) {
+					processingKeys.add(target.key);
+					processResolvedBlockBreak({
+						player,
+						dim,
+						dimensionId,
+						blockPos: target.pos,
+						originalBlockTypeId: target.blockTypeId,
+						blockDef: target.blockDef,
+						key: target.key,
+						allowSpread: false,
+					});
+				}
+			}
+
+			return true;
+		} finally {
+			processingKeys.delete(key);
+		}
+	}
+
 	// Boot restore:
 	// - Si el mundo se cerró con bloques en mined-state, al volver a entrar los restauramos ENSEGUIDA.
 	// - Esto evita acumulación de entries y elimina el caso "se queda eterno" si un timer no se reprograma.
@@ -791,118 +906,19 @@ export function initMiningRegen(userConfig) {
 
 			system.run(() => {
 				try {
-					if (!config || !config.enabled) {
-						processingKeys.delete(key);
-						return;
-					}
-
-					// Seguridad extra: si el jugador está en Creative, no aplicar mined-state/drops.
-					if (isCreativeBestEffort(player)) {
-						processingKeys.delete(key);
-						return;
-					}
-
-					// Verificar que el bloque sigue siendo el original (si otro sistema lo cambió, abortar)
-					const current = getBlockTypeIdSafe(dim, blockPos);
-					if (current !== originalBlockTypeId) {
-						if (isTargetTrace) tell(player, `§c[mining] abort: bloque cambió (${current})`);
-						processingKeys.delete(key);
-						return;
-					}
-
-					const didSetMinedState = setBlockTypeSafe(dim, blockPos, blockDef.minedBlockId);
-					if (!didSetMinedState) {
-						dbg(config, `No se pudo setear minedState=${blockDef.minedBlockId} en ${key}`);
-						if (isTargetTrace) tell(player, "§c[mining] mined-state FAIL (no se puede aplicar)" );
-						processingKeys.delete(key);
-						return;
-					}
-					if (isTargetTrace) tell(player, "§a[mining] mined-state=ok" );
-
-						// Sonido configurable: ya se intentó inmediato arriba.
-						// (No lo repetimos aquí para evitar doble sonido.)
-
-					// Resolver modifier scoreboard-driven.
-					let selected = selectActiveModifier(blockDef, {
+					processResolvedBlockBreak({
 						player,
-						blockDef,
+						dim,
 						dimensionId,
 						blockPos,
-						areas: Array.isArray(config?.areas) ? config.areas : [],
+						originalBlockTypeId,
+						blockDef,
+						key,
+						isTargetTrace,
+						allowSpread: true,
 					});
-
-					// Fortune tiers: si no hay modifier activo, aplicar sistema probabilístico.
-					if (!selected && blockDef.fortuneTiers) {
-						selected = resolveFortuneResult(blockDef.fortuneTiers, player);
-					}
-
-					const dropsTable = resolveDropsTable(blockDef, selected);
-
-					// Partículas: best-effort (keys configurables)
-					try {
-						const triggerKeys = getParticleTriggerModifierKeys(config);
-						if (selected && triggerKeys.includes(String(selected.key))) {
-							const p = blockDef && blockDef.particlesOnSilkTouch && typeof blockDef.particlesOnSilkTouch === "object" ? blockDef.particlesOnSilkTouch : null;
-							if (p && typeof p.fn === "function") {
-								const off = p.offset || { x: 0.5, y: 0.5, z: 0.5 };
-								p.fn(dim, { x: blockPos.x + off.x, y: blockPos.y + off.y, z: blockPos.z + off.z }, p.options);
-							}
-						}
-					} catch (e) {
-						void e;
-						// best-effort: no rompemos el minado por partículas
-					}
-
-					// Dropear items custom
-					const spawned = runDropsTable(dim, blockPos, dropsTable);
-
-						// XP (orbes) configurable
-						spawnXpOrbsBestEffort(config, dim, blockPos, blockDef);
-					if (debugTellPlayer(config)) {
-							tell(player, `§7[mining] drops=${spawned} skill=${blockDef.skill} regen=${blockDef.regenSeconds}s`);
-					}
-
-					// Métricas (scoreboards) + XP skill-aware - best-effort
-					{
-						const globalAdds = metricsEnabled(config) ? getScoreboardAddsOnBreak(config) : null;
-						const blockAdds = blockDef && blockDef.scoreboardAddsOnBreak && typeof blockDef.scoreboardAddsOnBreak === "object" ? blockDef.scoreboardAddsOnBreak : null;
-						const modifierAdds = getModifierScoreboardAdds(selected);
-
-						let xpAdds = null;
-						// XP: modifier > block-level xp (independiente de fortuna)
-						const xpRule = getModifierXpRule(selected)
-							?? (blockDef?.xp && typeof blockDef.xp === "object" ? blockDef.xp : null);
-						const xpGain = resolveXpGain(xpRule, player);
-							if (xpRule && xpGain && xpGain.gain > 0) {
-							const gainObjective = String(xpRule.gainObjective ?? "").trim();
-							if (gainObjective) xpAdds = { [gainObjective]: xpGain.gain };
-								emitXpTitleBestEffort(config, player, blockDef, selected, xpRule, xpGain);
-						}
-
-						const merged = mergeScoreboardAdds(mergeScoreboardAdds(mergeScoreboardAdds(globalAdds, blockAdds), modifierAdds), xpAdds);
-						if (merged) {
-							applyScoreboardAddsBestEffort(config, dim, player, merged);
-							onSkillScoreboardsApplied(player, merged);
-						}
-					}
-
-					// Registrar regeneración (esto también mete key en persistencia)
-					const entry = {
-						dimensionId,
-						x: blockPos.x,
-						y: blockPos.y,
-						z: blockPos.z,
-						// Guardamos el bloque original real (importante para matches prefix/any)
-						blockId: originalBlockTypeId,
-						minedBlockId: blockDef.minedBlockId,
-						restoreAt: nowMs() + blockDef.regenSeconds * 1000,
-					};
-					// Pasamos de "processing" a "pending" real.
-					processingKeys.delete(key);
-					addPending(entry);
 				} catch (e) {
 					void e;
-					processingKeys.delete(key);
 				}
 			});
 		} catch (e) {

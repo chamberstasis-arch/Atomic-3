@@ -1,6 +1,7 @@
 import { anticheatConfig } from "../features/anticheat/anticheat.config.js";
 import { damageCalcConfig } from "../features/skills/combat/calc/config.js";
 import { STAT_REGISTRY } from "../features/skills/lecture/statRegistry.js";
+import { foragingSkillConfig } from "../features/skills/foraging/config.js";
 import { miningSkillConfig } from "../features/skills/mining/config.js";
 import { skillRegenConfig } from "../features/skills/regeneration/config.js";
 import achievementsConfig from "../features/achievements/config.js";
@@ -63,6 +64,10 @@ function addRegenObjectives(list, seen, config) {
 			if (go) addObjective(list, seen, go, go);
 		}
 
+		const spread = block?.spread && typeof block.spread === "object" ? block.spread : null;
+		const spreadObjective = safeString(spread?.objective);
+		if (spreadObjective) addObjective(list, seen, spreadObjective, spreadObjective);
+
 		// Fortune tiers: escanear tiers para scoreboards (solo scoreboardAddsOnBreak)
 		const ft = block?.fortuneTiers;
 		if (ft && typeof ft === "object") {
@@ -86,6 +91,10 @@ function addRegenObjectives(list, seen, config) {
 			if (lvlObjective) addObjective(list, seen, lvlObjective, lvlObjective);
 		}
 	}
+
+	const spreadDefaults = config?.runtime?.spread;
+	const spreadDefaultObjective = safeString(spreadDefaults?.objective);
+	if (spreadDefaultObjective) addObjective(list, seen, spreadDefaultObjective, spreadDefaultObjective);
 }
 
 const PLACEHOLDER_RE = /\$\{([^:}]+):([^}]+)\}/g;
@@ -121,10 +130,10 @@ function addTitlesPriorityObjectives(list, seen, config) {
 	}
 }
 
-function addMiningObjectives(list, seen, config) {
+function addSkillProgressionObjectives(list, seen, config) {
 	const xp = safeString(config?.scoreboards?.xp);
 	const lvl = safeString(config?.scoreboards?.level);
-	const fortuneObjective = safeString(config?.rewards?.fortuneObjective);
+	const fortuneObjective = safeString(config?.rewards?.primaryObjective ?? config?.rewards?.fortuneObjective);
 	if (xp) addObjective(list, seen, xp, xp);
 	if (lvl) addObjective(list, seen, lvl, lvl);
 	if (fortuneObjective) addObjective(list, seen, fortuneObjective, fortuneObjective);
@@ -278,7 +287,8 @@ export function buildScoreboardCatalog() {
 	addRegenObjectives(list, seen, skillRegenConfig);
 
 	// --- Mining / levels (configurable) ---
-	addMiningObjectives(list, seen, miningSkillConfig);
+	addSkillProgressionObjectives(list, seen, miningSkillConfig);
+	addSkillProgressionObjectives(list, seen, foragingSkillConfig);
 
 	// --- Systems / Titles Priority (configurable) ---
 	addTitlesPriorityObjectives(list, seen, titlesPriorityConfig);

@@ -1,10 +1,17 @@
 # Skill Foraging
 
-> Minecraft Bedrock 1.21.132 · Documento de especificacion sobre `core/`
+> Minecraft Bedrock 1.21.132 · Skill operativa sobre `core/`
 
-Este documento define a `foraging/` como skill consumidora del futuro `skills/core/`.
+Este documento define a `foraging/` como skill consumidora de `skills/core/`.
 
 No describe un sistema aislado ni una copia de `mining/`. Su rol es declarar reglas, progresion, recompensas y pruebas de la skill de tala sobre los motores compartidos del proyecto.
+
+## Estado actual
+
+- `foraging/config.js` ya define scoreboards, niveles, rewards y mensajes de subida.
+- `foraging/index.js` ya registra la skill en `core/` y conserva una API publica simple.
+- `regeneration/` ya usa la skill por `skillId` y activa spread configurable con `FrenTalTotalH` en el bloque de prueba `oak log`.
+- Los objectives siguen registrandose desde `scripts/scoreboards/catalog.js`, no desde `foraging/`.
 
 ---
 
@@ -107,7 +114,7 @@ flowchart TD
 
 ---
 
-## 6. Contrato de configuracion objetivo
+## 6. Contrato de configuracion vigente
 
 ```js
 export const foragingSkillConfig = {
@@ -123,16 +130,17 @@ export const foragingSkillConfig = {
     fortunePerLevel: 4
   },
 
-  levels: [
-    { level: 1, xpRequired: 0 },
-    { level: 2, xpRequired: 20 },
-    { level: 3, xpRequired: 100 }
-  ],
+   titleColorFallback: "§f",
+
+   levels: [
+      { level: 1, xpRequired: 0 },
+      { level: 2, xpRequired: 20, titleColor: "§a" },
+      { level: 3, xpRequired: 60, titleColor: "§2" }
+   ],
 
   levelUpMessage: [
-    "Habilidad mejorada",
-    "Tala <PreviousLevel> -> <NextLevel>",
-    "+<PreviousFortune> -> <NextFortune> de Fortuna de Tala",
+      "Habilidad: <levelUpForaging>",
+      "+<PreviousFortune> -> <NextFortune> de Fortuna de Tala",
     "<OtherAwards>"
   ]
 };
@@ -260,12 +268,13 @@ export const foragingSkillConfig = {
 
 ---
 
-## 10. Validaciones documentales antes de implementar
+## 10. Validaciones documentales y tecnicas
 
 - Confirmar que todos los objectives requeridos ya estan en `scoreboards/catalog.js`.
-- Confirmar que `regeneration/` no depende de `mining/` para resolver progreso visual de `foraging`.
+- Confirmar que `regeneration/` ya no depende de `mining/` para resolver progreso visual de `foraging`.
 - Confirmar que la API publica del `core/` cubre `foraging` sin excepciones especiales.
 - Confirmar que la documentacion del spread pertenece a `regeneration/` y no se dispersa en varias skills.
+- Confirmar que no existe ningun `world.scoreboard.addObjective()` dentro de `skills/`.
 
 ---
 

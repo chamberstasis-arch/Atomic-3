@@ -57,10 +57,9 @@ skills/
   core/                      ← NUEVO: progreso compartido de skills
     README.md
     index.js
+    config.js
     registry.js
     progression.js
-    rewards.js
-    titles.js
     scoreboards.js
   lecture/                   ← NUEVO: lectura centralizada de lore
     README.md

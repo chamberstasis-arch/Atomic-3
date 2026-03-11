@@ -6,6 +6,14 @@ Este documento reemplaza la antigua nota de trabajo `foraging/Foraging.md`.
 
 Su objetivo ya no es describir solamente la skill de tala, sino servir como guia de migracion para reestructurar `skills/` alrededor de un `core/` reutilizable, manteniendo a `foraging/` como primer consumidor fuerte del nuevo modelo.
 
+## Estado actual de implementacion
+
+- `core/` ya existe como runtime compartido y actualmente resuelve la progresion de `mining/` y `foraging/`.
+- `regeneration/` ya no importa helpers especificos de `mining/`; ahora consume el `core/` por `skillId`.
+- `foraging/` ya entro como skill real con `config.js` e `index.js` propios.
+- `regeneration/spread.js` ya existe como helper global configurable por scoreboard.
+- La creacion de objectives sigue centralizada en `scripts/scoreboards/catalog.js` e `initAllScoreboards()`.
+
 ---
 
 ## 1. Objetivo
@@ -34,7 +42,6 @@ Esta migracion cubre:
 
 Esta migracion no cubre todavia:
 
-- La implementacion completa de `foraging/`.
 - La implementacion de `fishing/` dentro del mismo core.
 - Cambios de gameplay no relacionados con skills.
 - Refactors cosmeticos fuera de `skills/`.
@@ -49,14 +56,14 @@ Hoy el proyecto ya tiene una base valida sobre la cual migrar:
 - `lecture/` ya centraliza la lectura de lore y soporta `FortTal`, `FrenTal` y `ExpTal`.
 - `regeneration/` ya funciona como motor global para `mining`, `foraging` y `farming` a nivel de configuracion de bloques.
 - `mining/` ya tiene un sistema real de niveles y recompensas.
-- `foraging/` existe como carpeta objetivo, pero aun no como implementacion completa.
+- `foraging/` ya existe como skill consumidora del core con progresion propia.
 - Los scoreboards se inicializan desde `scripts/scoreboards/` mediante un catalogo central, no desde cada skill.
 
-El principal problema actual no es falta de base, sino el acoplamiento entre piezas que ya crecieron:
+El principal problema actual no es falta de base, sino cerrar y estabilizar la migracion sobre esa base:
 
-- `regeneration/` todavia importa helpers especificos de `mining/` para calcular progreso visual y reaccionar a scoreboards aplicados.
-- La logica de niveles vive en `mining/`, por lo que otras skills no pueden reutilizarla sin copiarla.
-- `foraging/` necesita una mecanica nueva de propagacion por bloques adyacentes que deberia ser global, no local.
+- Consolidar `foraging/` con pruebas reales de progression, fortune y spread.
+- Extender el mismo patron a `farming/` cuando se formalice su catalogo.
+- Mantener el desacople para que nuevas skills no vuelvan a empujar logica comun hacia `mining/` o `regeneration/`.
 
 ### 3.1 Hallazgo operativo sobre scoreboards
 
@@ -118,8 +125,6 @@ skills/
     config.js
     registry.js
     progression.js
-    rewards.js
-    titles.js
     scoreboards.js
   lecture/
     index.js
@@ -266,6 +271,12 @@ Donde $P(x)$ representa una oportunidad probabilistica de obtener un bloque extr
 
 Este sistema debe vivir en un helper global, por ejemplo `regeneration/spread.js`, para que pueda reutilizarse despues por `mining/` o `farming/` si aparece una mecanica equivalente.
 
+Estado actual:
+
+- `regeneration/spread.js` ya implementa expansion ortogonal basada en scoreboard.
+- La configuracion vive en `regeneration/config.js` con defaults globales en `runtime.spread` y activacion por bloque en `block.spread`.
+- El primer consumidor activo es `oak log` con `FrenTalTotalH`.
+
 ### 6.3 Experiencia de Talado
 
 Debe seguir el mismo modelo funcional que `mining`:
@@ -386,12 +397,16 @@ Cuando una IA edite esta zona del proyecto, debe asumir lo siguiente:
 - Mantener wrappers temporales en `mining/` para no romper imports al inicio.
 - Definir un registro formal por skill para que `core/` no hardcodee mineria como caso especial.
 
+Estado: completada en implementacion inicial.
+
 ### Fase 3. Desacoplar `regeneration/` de `mining/`
 
 - Reemplazar imports directos de helpers de mineria por helpers del core.
 - Hacer que el progreso visual consulte el core por `skillId`.
 - Evitar condicionales especiales para una sola skill cuando la regla sea compartida.
 - Confirmar que `regeneration/` solo consuma objectives ya catalogados y no cree dependencias ocultas.
+
+Estado: completada para progreso y XP titles.
 
 ### Fase 4. Implementar `foraging/` sobre el core
 
@@ -400,17 +415,23 @@ Cuando una IA edite esta zona del proyecto, debe asumir lo siguiente:
 - Consumir `SkillXpTala` y `SkillLvlTala` desde el mismo flujo comun.
 - Declarar y validar todos los objectives asociados desde `scoreboards/catalog.js` antes de integrar la skill.
 
+Estado: completada en primera version operativa.
+
 ### Fase 5. Introducir spread global
 
 - Crear helper global de propagacion en `regeneration/`.
 - Integrarlo primero con `foraging/`.
 - Dejarlo listo para otros usos sin acoplarlo a tala exclusivamente.
 
+Estado: completada en primera version configurable por scoreboard.
+
 ### Fase 6. Normalizar documentacion
 
 - Mantener documentos de diseno separados de contratos vigentes.
 - Marcar claramente que archivos son plan, migracion o especificacion implementada.
 - Evitar documentos viejos que describan una arquitectura ya superada.
+
+Estado: en curso continuo.
 
 ---
 

@@ -5,8 +5,12 @@ import { initAntiCheat } from "./features/anticheat/index.js";
 import { initCommands } from "./modules/commands/index.js";
 import { initSkillRegeneration } from "./features/skills/regeneration/index.js";
 import { skillRegenConfig } from "./features/skills/regeneration/config.js";
+import { initSkillsCore } from "./features/skills/core/index.js";
+import { skillsCoreConfig } from "./features/skills/core/config.js";
 import { initSkillMining } from "./features/skills/mining/index.js";
 import { miningSkillConfig } from "./features/skills/mining/config.js";
+import { initSkillForaging } from "./features/skills/foraging/index.js";
+import { foragingSkillConfig } from "./features/skills/foraging/config.js";
 import { initCustomEmojis } from "./features/custom-emojis/index.js";
 import { initCustomItems } from "./features/custom-items/index.js";
 import { customItemsConfig } from "./features/custom-items/config.js";
@@ -39,10 +43,12 @@ initCustomEmojis();
 initCustomItems(customItemsConfig);
 initHolograms(hologramsConfig);
 initTitlesPrioritySystem(titlesPriorityConfig);
-initSkillMining(miningSkillConfig);
-initSkillRegeneration(skillRegenConfig);
-// Orden estricto (scoreboards -> lecture -> calc -> combat)
+// Orden de skills: scoreboards -> lecture -> core -> skills -> regeneration -> combat
 initLecture(lectureConfig);
+initSkillsCore(skillsCoreConfig);
+initSkillMining(miningSkillConfig);
+initSkillForaging(foragingSkillConfig);
+initSkillRegeneration(skillRegenConfig);
 initDamageCalc(damageCalcConfig);
 initVanillaDamageCancel();
 initCombatHealth();

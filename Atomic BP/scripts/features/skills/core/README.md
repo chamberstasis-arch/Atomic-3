@@ -2,9 +2,9 @@
 
 > Minecraft Bedrock 1.21.132 · `@minecraft/server` 2.4.0
 
-Documento rector del futuro `skills/core/`.
+Documento rector de `skills/core/`.
 
-Este modulo no existe aun como implementacion completa, pero desde este punto se considera el contrato objetivo para la reestructura de `skills/`.
+Este modulo ya cuenta con una implementacion inicial operativa para la migracion de `mining/`, aunque el contrato sigue creciendo para cubrir `foraging/` y `farming/`.
 
 ---
 
@@ -78,11 +78,9 @@ Contratos recomendados:
 initSkillsCore(config)
 registerSkillDefinition(skillId, definition)
 getSkillDefinition(skillId)
-resolveSkillLevel(skillId, player)
 getSkillNextXpRequirement(skillId, currentLevel)
-reconcileSkillRewards(skillId, player)
+reconcileSkillForPlayer(skillId, player, source)
 onSkillScoreboardsApplied(skillId, player, addsMap)
-buildSkillProgressPayload(skillId, player)
 ```
 
 ### Regla de exportacion
@@ -167,18 +165,8 @@ flowchart TD
 - Resolver nivel alcanzable.
 - Calcular siguiente threshold.
 - Validar requirements adicionales.
-
-### `rewards.js`
-
-- Resolver target final de rewards por nivel.
-- Corregir desincronizacion de scoreboards.
-- Evitar aplicar acumulados irreversibles por evento.
-
-### `titles.js`
-
-- Construir payload de progreso.
-- Reemplazar placeholders.
-- Delegar el render real a sistemas externos como `titlesPriority` o chat.
+- Reconciliar rewards persistentes por nivel.
+- Construir payloads de mensaje y placeholders de subida.
 
 ### `scoreboards.js`
 
@@ -286,4 +274,4 @@ flowchart TD
 
 ## 12. Siguiente paso recomendado
 
-Implementar primero el registro por `skillId` y los helpers de progresion del core antes de mover la skill de mineria al nuevo contrato.
+Continuar con la entrada de `foraging/` como siguiente skill consumidora del core, manteniendo `regeneration/` desacoplado de reglas especificas de mineria.

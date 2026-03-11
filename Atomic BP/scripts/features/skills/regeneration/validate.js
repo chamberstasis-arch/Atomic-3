@@ -95,6 +95,31 @@ function validateModifierRule(rule, label, warnings) {
 	if (effects.title != null && !isObj(effects.title)) warnings.push(`${label}: effects.title debería ser objeto`);
 }
 
+function validateSpreadConfig(spread, label, warnings) {
+	if (spread == null) return;
+	if (!isObj(spread)) {
+		warnings.push(`${label}: spread debería ser un objeto`);
+		return;
+	}
+	if (spread.enabled === true && !asStr(spread.objective)) warnings.push(`${label}: spread.objective es requerido cuando spread.enabled=true`);
+	if (spread.objective != null && !asStr(spread.objective)) warnings.push(`${label}: spread.objective inválido`);
+	if (spread.pointsPerExtra != null && (!isFiniteNumber(spread.pointsPerExtra) || Number(spread.pointsPerExtra) <= 0)) {
+		warnings.push(`${label}: spread.pointsPerExtra debería ser > 0`);
+	}
+	if (spread.maxExtraBlocks != null && (!isFiniteNumber(spread.maxExtraBlocks) || Number(spread.maxExtraBlocks) < 0)) {
+		warnings.push(`${label}: spread.maxExtraBlocks debería ser >= 0`);
+	}
+	if (spread.maxVisitedBlocks != null && (!isFiniteNumber(spread.maxVisitedBlocks) || Number(spread.maxVisitedBlocks) <= 0)) {
+		warnings.push(`${label}: spread.maxVisitedBlocks debería ser > 0`);
+	}
+	if (spread.matchMode != null) {
+		const matchMode = asStr(spread.matchMode).toLowerCase();
+		if (matchMode && matchMode !== "same-block-type" && matchMode !== "same-definition" && matchMode !== "same-skill") {
+			warnings.push(`${label}: spread.matchMode debería ser 'same-block-type', 'same-definition' o 'same-skill'`);
+		}
+	}
+}
+
 /**
  * @param {any} config
  * @returns {{ warnings: string[], errors: string[] }}
@@ -146,6 +171,7 @@ export function validateSkillRegenConfig(config) {
 
 	const blocks = Array.isArray(config.blocks) ? config.blocks : [];
 	if (blocks.length === 0) warnings.push("Config: blocks está vacío (no hay bloques regenerables registrados)");
+	validateSpreadConfig(config?.runtime?.spread, "Config runtime", warnings);
 	let usesAreaFilters = false;
 	for (const [i, b] of blocks.entries()) {
 		if (!isObj(b)) {
@@ -207,6 +233,7 @@ export function validateSkillRegenConfig(config) {
 		if (b.scoreboardAddsOnBreak != null) {
 			validateScoreboardAddsObject(b.scoreboardAddsOnBreak, `Block[${i}] (${asStr(b.id) || "?"})`, warnings);
 		}
+		validateSpreadConfig(b.spread, `Block[${i}] (${asStr(b.id) || "?"})`, warnings);
 
 		// Métricas por-modifier
 		if (b.modifiers != null) {

@@ -120,6 +120,13 @@ export const skillRegenConfig = {
 		xpOrbs: {
 			maxSpawnPerBreak: 25,
 		},
+		spread: {
+			enabledByDefault: false,
+			pointsPerExtra: 100,
+			maxExtraBlocks: 12,
+			maxVisitedBlocks: 128,
+			matchMode: "same-block-type",
+		},
 		particles: {
 			// Keys de modifiers que disparan particlesOnSilkTouch.
 			triggerModifierKeys: ["silk_touch_1"],
@@ -298,7 +305,15 @@ export const skillRegenConfig = {
 			id: "oak log",
 			skill: "foraging",
 			blockId: "minecraft:oak_log",
-			areas: ["B"],
+			areas: ["A", "B"],
+			spread: {
+				enabled: true,
+				objective: "FrenTalTotalH",
+				pointsPerExtra: 100,
+				maxExtraBlocks: 16,
+				maxVisitedBlocks: 196,
+				matchMode: "same-block-type",
+			},
 			// mined-state específico para este bloque
 			minedBlockId: "minecraft:brown_terracotta",
 			regenSeconds: 15,

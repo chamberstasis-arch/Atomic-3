@@ -299,6 +299,7 @@ export function normalizeBlockDefinition(blockDef, config) {
 	const drops = Array.isArray(blockDef && blockDef.drops) ? blockDef.drops : [];
 	const modifiers = normalizeModifiers(blockDef && blockDef.modifiers);
 	const fortuneTiers = normalizeFortuneTiers(blockDef && blockDef.fortuneTiers);
+	const spread = blockDef && blockDef.spread && typeof blockDef.spread === "object" ? blockDef.spread : undefined;
 
 	// XP y xpTitle block-level (independientes de fortuna)
 	const xp = blockDef && blockDef.xp && typeof blockDef.xp === "object" ? blockDef.xp : undefined;
@@ -321,6 +322,7 @@ export function normalizeBlockDefinition(blockDef, config) {
 		drops,
 		modifiers,
 		fortuneTiers,
+		spread,
 		xp,
 		xpTitle,
 	};

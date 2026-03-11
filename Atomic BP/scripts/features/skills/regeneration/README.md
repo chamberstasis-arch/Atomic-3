@@ -2,6 +2,12 @@
 
 Sistema de regeneración de bloques por evento (`beforeEvents.playerBreakBlock`) con drops custom, modifiers scoreboard-driven, persistencia de pendientes y titles temporales vía `titlesPriority`.
 
+Estado actual:
+
+- `regeneration/` ya consume `core/` por `skillId` para requerimientos de nivel y reconciliación tras XP.
+- El helper global `spread.js` ya está operativo y configurable desde `config.js`.
+- `regeneration/` no crea objectives; solo consume scoreboards ya catalogados en `scripts/scoreboards/`.
+
 ## Alcance del módulo
 - Intercepta minado/tala/cosecha y cancela el break vanilla.
 - Aplica `minedBlockId` temporal, drops custom y agenda restauración.
@@ -14,6 +20,7 @@ Sistema de regeneración de bloques por evento (`beforeEvents.playerBreakBlock`)
 `runtime` es configuración local de `regeneration` (no global del addon).
 
 - `runtime.xpOrbs.maxSpawnPerBreak`: cap anti-spam de orbes XP.
+- `runtime.spread`: defaults globales para propagación por bloques adyacentes.
 - `runtime.particles.triggerModifierKeys`: keys de modifiers que disparan `particlesOnSilkTouch`.
 - `runtime.titles`:
   - `enabledByDefault`, `source`, `priority`, `durationTicks`, `contentTemplate`.
@@ -39,6 +46,24 @@ Cada bloque define `modifiers` como array de reglas:
   - `scoreboardAddsOnBreak`
   - `xp` (`base`, `scalingObjective`, `gainObjective?`, `levelObjective?`, `stepPerPoints?`)
   - `title`
+
+## Spread global por scoreboard
+Cada bloque puede declarar `spread` para propagar la rotura a vecinos ortogonales válidos.
+
+Contrato soportado:
+
+- `enabled`: activa la mecánica en el bloque.
+- `objective`: scoreboard leído para calcular extras.
+- `pointsPerExtra`: cada cuántos puntos se garantiza un bloque adicional.
+- `maxExtraBlocks`: tope duro de bloques extra por evento.
+- `maxVisitedBlocks`: límite de exploración BFS para evitar expansión descontrolada.
+- `matchMode`: `same-block-type`, `same-definition` o `same-skill`.
+
+Regla actual:
+
+- `extras = floor(score / pointsPerExtra) + probabilidad(residuo / pointsPerExtra)`
+- La búsqueda usa vecinos ortogonales en 6 direcciones.
+- El primer consumidor activo es `foraging` con `FrenTalTotalH`.
 
 ## XP gain y progress provisional
 ### Ganancia por evento

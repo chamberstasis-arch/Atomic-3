@@ -58,12 +58,35 @@ Contrato soportado:
 - `maxExtraBlocks`: tope duro de bloques extra por evento.
 - `maxVisitedBlocks`: límite de exploración BFS para evitar expansión descontrolada.
 - `matchMode`: `same-block-type`, `same-definition` o `same-skill`.
+- `randomness`: valor `0..1` para desordenar la exploración y hacer menos predecible la forma final.
+- `sound`:
+  - `enabled`: reproduce el sonido del bloque una vez por cada bloque extra afectado.
+  - `pitchJitter`: altera levemente el pitch por bloque para saturar el impacto sin sonar plano.
 
 Regla actual:
 
 - `extras = floor(score / pointsPerExtra) + probabilidad(residuo / pointsPerExtra)`
 - La búsqueda usa vecinos ortogonales en 6 direcciones.
+- Si `randomness > 0`, el frente de búsqueda y el orden de vecinos se mezclan parcialmente.
 - El primer consumidor activo es `foraging` con `FrenTalTotalH`.
+
+### Sonido por spread
+
+Cuando `spread.sound.enabled=true`, cada bloque extra afectado reproduce su propio `sounds[]` del bloque base/registrado.
+
+Esto hace que:
+
+- tala con varios logs suene más cargada,
+- minería con varios minerales pueda saturar `dig.stone`,
+- cosecha futura pueda hacer lo mismo con `dig.grass`.
+
+El bloque origen mantiene su sonido normal; los bloques extra agregan repeticiones adicionales.
+
+### Estado por skill
+
+- `foraging`: activo con `FrenTalTotalH`, randomness y sound burst habilitados.
+- `mining`: contrato de spread preparado pero desactivado hasta que exista la stat futura.
+- `farming`: contrato de spread preparado pero desactivado hasta que exista la stat futura.
 
 ## XP gain y progress provisional
 ### Ganancia por evento

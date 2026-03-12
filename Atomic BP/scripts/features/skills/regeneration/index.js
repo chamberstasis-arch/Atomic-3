@@ -130,14 +130,20 @@ function getNoLevelsTitleTemplate(config) {
 	return ["+${xpGain} (${xpTotal})"];
 }
 
-function buildXpTitlePayload(config, player, blockDef, xpRule, xpGain) {
+function buildXpTitlePayload(config, player, blockDef, xpRule, xpGain, options = {}) {
 	const skill = normalizeSkillId(blockDef?.skill);
 	const gain = Math.max(0, Math.trunc(Number(xpGain?.gain) || 0));
 	const objectiveIds = getSkillProgressObjectiveIds(config, skill, xpRule);
 
-	const currentXp = objectiveIds.xpObjective ? (getScoreBestEffort(player, objectiveIds.xpObjective) ?? 0) : 0;
-	const currentLevel = objectiveIds.levelObjective ? (getScoreBestEffort(player, objectiveIds.levelObjective) ?? 0) : 0;
-	const xpActual = Math.max(0, currentXp + gain);
+	const currentXpRaw = options.currentXpOverride;
+	const currentLevelRaw = options.currentLevelOverride;
+	const currentXp = Number.isFinite(Number(currentXpRaw))
+		? Math.max(0, Math.trunc(Number(currentXpRaw)))
+		: (objectiveIds.xpObjective ? (getScoreBestEffort(player, objectiveIds.xpObjective) ?? 0) : 0);
+	const currentLevel = Number.isFinite(Number(currentLevelRaw))
+		? Math.max(0, Math.trunc(Number(currentLevelRaw)))
+		: (objectiveIds.levelObjective ? (getScoreBestEffort(player, objectiveIds.levelObjective) ?? 0) : 0);
+	const xpActual = Number.isFinite(Number(currentXpRaw)) ? currentXp : Math.max(0, currentXp + gain);
 	const requirementFromCatalog = Number(getSkillNextXpRequirement(skill, currentLevel));
 	const hasLevelRequirement = Number.isFinite(requirementFromCatalog) && requirementFromCatalog > 0;
 	const xpRequeriment = hasLevelRequirement ? Math.trunc(requirementFromCatalog) : 0;
@@ -153,6 +159,82 @@ function buildXpTitlePayload(config, player, blockDef, xpRule, xpGain) {
 		skillXpObjective: objectiveIds.xpObjective,
 		skillLvlObjective: objectiveIds.levelObjective,
 	};
+}
+
+function resolveXpTitleDescriptor(config, blockDef, selected) {
+	const titleRule = getModifierTitleRule(selected)
+		?? (blockDef?.xpTitle && typeof blockDef.xpTitle === "object" ? blockDef.xpTitle : null);
+	const title = titleRule && typeof titleRule === "object" ? titleRule : {};
+	const defaults = getTitleDefaults(config);
+	if (titleRule && titleRule.enabled !== true) return null;
+	if (!titleRule && !defaults.enabledByDefault) return null;
+	return {
+		template: title.content ?? defaults.contentTemplate,
+		source: String(title.source ?? defaults.source),
+		id: String(title.id ?? `xp_${String(blockDef?.skill ?? "unknown")}`),
+		priority: Number.isFinite(Number(title.priority)) ? Number(title.priority) : defaults.priority,
+		durationTicks: Number.isFinite(Number(title.durationTicks)) ? Number(title.durationTicks) : defaults.durationTicks,
+		durationMs: Number.isFinite(Number(title.durationMs)) ? Number(title.durationMs) : undefined,
+	};
+}
+
+function makeXpTitleBatch() {
+	return { entries: new Map() };
+}
+
+function accumulateXpTitleBatch(batch, config, player, blockDef, selected, xpRule, xpGain) {
+	if (!batch?.entries || !player || !xpGain || xpGain.gain <= 0) return;
+	const descriptor = resolveXpTitleDescriptor(config, blockDef, selected);
+	if (!descriptor) return;
+	const skill = normalizeSkillId(blockDef?.skill);
+	const key = `${skill}|${descriptor.source}|${descriptor.id}`;
+	const previous = batch.entries.get(key);
+	if (previous) {
+		previous.totalGain += Math.max(0, Math.trunc(Number(xpGain.gain) || 0));
+		previous.blockCount += 1;
+		return;
+	}
+	batch.entries.set(key, {
+		config,
+		player,
+		blockDef,
+		xpRule,
+		descriptor,
+		totalGain: Math.max(0, Math.trunc(Number(xpGain.gain) || 0)),
+		blockCount: 1,
+	});
+}
+
+function flushXpTitleBatch(batch) {
+	if (!batch?.entries || batch.entries.size === 0) return;
+	for (const entry of batch.entries.values()) {
+		const totalGain = Math.max(0, Math.trunc(Number(entry.totalGain) || 0));
+		if (totalGain <= 0) continue;
+		const skill = normalizeSkillId(entry.blockDef?.skill);
+		const objectiveIds = getSkillProgressObjectiveIds(entry.config, skill, entry.xpRule);
+		const currentXp = objectiveIds.xpObjective ? (getScoreBestEffort(entry.player, objectiveIds.xpObjective) ?? 0) : 0;
+		const currentLevel = objectiveIds.levelObjective ? (getScoreBestEffort(entry.player, objectiveIds.levelObjective) ?? 0) : 0;
+		const payload = buildXpTitlePayload(
+			entry.config,
+			entry.player,
+			entry.blockDef,
+			entry.xpRule,
+			{ gain: totalGain },
+			{ currentXpOverride: currentXp, currentLevelOverride: currentLevel }
+		);
+		const chosenTemplate = payload.hasLevelRequirement ? entry.descriptor.template : getNoLevelsTitleTemplate(entry.config);
+		const content = renderTitleContent(chosenTemplate, payload);
+		upsertTemporaryTitle({
+			target: entry.player,
+			source: entry.descriptor.source,
+			id: entry.descriptor.id,
+			priority: entry.descriptor.priority,
+			durationTicks: entry.descriptor.durationTicks,
+			durationMs: entry.descriptor.durationMs,
+			content,
+		});
+	}
+	batch.entries.clear();
 }
 
 function getScoreboardAddsOnBreak(config) {
@@ -285,26 +367,19 @@ function renderTitleContent(templateLines, payload) {
 
 function emitXpTitleBestEffort(config, player, blockDef, selected, xpRule, xpGain) {
 	if (!player || !xpGain || xpGain.gain <= 0) return;
-	// Title: modifier > block-level xpTitle > config defaults
-	const titleRule = getModifierTitleRule(selected)
-		?? (blockDef?.xpTitle && typeof blockDef.xpTitle === "object" ? blockDef.xpTitle : null);
-	const title = titleRule && typeof titleRule === "object" ? titleRule : {};
-	const defaults = getTitleDefaults(config);
-	if (titleRule && titleRule.enabled !== true) return;
-	if (!titleRule && !defaults.enabledByDefault) return;
-
+	const descriptor = resolveXpTitleDescriptor(config, blockDef, selected);
+	if (!descriptor) return;
 	const payload = buildXpTitlePayload(config, player, blockDef, xpRule, xpGain);
-	const template = title.content ?? defaults.contentTemplate;
-	const chosenTemplate = payload.hasLevelRequirement ? template : getNoLevelsTitleTemplate(config);
+	const chosenTemplate = payload.hasLevelRequirement ? descriptor.template : getNoLevelsTitleTemplate(config);
 	const content = renderTitleContent(chosenTemplate, payload);
 
 	upsertTemporaryTitle({
 		target: player,
-		source: String(title.source ?? defaults.source),
-		id: String(title.id ?? `xp_${String(blockDef?.skill ?? "unknown")}`),
-		priority: Number.isFinite(Number(title.priority)) ? Number(title.priority) : defaults.priority,
-		durationTicks: Number.isFinite(Number(title.durationTicks)) ? Number(title.durationTicks) : defaults.durationTicks,
-		durationMs: Number.isFinite(Number(title.durationMs)) ? Number(title.durationMs) : undefined,
+		source: descriptor.source,
+		id: descriptor.id,
+		priority: descriptor.priority,
+		durationTicks: descriptor.durationTicks,
+		durationMs: descriptor.durationMs,
 		content,
 	});
 }
@@ -404,6 +479,28 @@ function playMineSoundBestEffort(config, player, dimension, pos, oreDef, traceTo
 		void e;
 		dbg(config, "sound: excepción inesperada");
 	}
+}
+
+function buildSpreadBurstSounds(blockDef, spreadConfig) {
+	const sounds = Array.isArray(blockDef?.sounds) ? blockDef.sounds : [];
+	if (sounds.length === 0) return [];
+	const jitter = Number(spreadConfig?.sound?.pitchJitter ?? 0);
+	if (!Number.isFinite(jitter) || jitter <= 0) return sounds;
+	return sounds.map((sound) => {
+		const basePitch = Number.isFinite(Number(sound?.pitch)) ? Number(sound.pitch) : 1;
+		const delta = (Math.random() * 2 - 1) * jitter;
+		return {
+			...sound,
+			pitch: Math.max(0, Math.min(2, basePitch + delta)),
+		};
+	});
+}
+
+function playSpreadBurstSoundBestEffort(config, player, dimension, pos, blockDef, spreadConfig) {
+	if (!spreadConfig?.sound?.enabled) return;
+	const sounds = buildSpreadBurstSounds(blockDef, spreadConfig);
+	if (!Array.isArray(sounds) || sounds.length === 0) return;
+	playMineSoundBestEffort(config, player, dimension, pos, { ...blockDef, sounds }, false);
 }
 
 function rollChancePct(chancePct) {
@@ -646,35 +743,50 @@ export function initMiningRegen(userConfig) {
 		return true;
 	}
 
-	function processResolvedBlockBreak({ player, dim, dimensionId, blockPos, originalBlockTypeId, blockDef, key, isTargetTrace = false, allowSpread = false }) {
+	function processResolvedBlockBreak({ player, dim, dimensionId, blockPos, originalBlockTypeId, blockDef, key, isTargetTrace = false, allowSpread = false, minedStatePreApplied = false, selectedOverride = undefined, xpTitleBatch = null }) {
 		try {
 			if (!config || !config.enabled) return false;
 			if (isCreativeBestEffort(player)) return false;
 
 			const current = getBlockTypeIdSafe(dim, blockPos);
-			if (current !== originalBlockTypeId) {
-				if (isTargetTrace) tell(player, `§c[mining] abort: bloque cambió (${current})`);
-				return false;
-			}
+			if (minedStatePreApplied) {
+				if (current !== blockDef.minedBlockId) {
+					const recovered = current === originalBlockTypeId
+						? setBlockTypeSafe(dim, blockPos, blockDef.minedBlockId)
+						: false;
+					if (!recovered) {
+						if (isTargetTrace) tell(player, `§c[mining] abort: bloque cambió (${current})`);
+						return false;
+					}
+				}
+			} else {
+				if (current !== originalBlockTypeId) {
+					if (isTargetTrace) tell(player, `§c[mining] abort: bloque cambió (${current})`);
+					return false;
+				}
 
-			const didSetMinedState = setBlockTypeSafe(dim, blockPos, blockDef.minedBlockId);
-			if (!didSetMinedState) {
-				dbg(config, `No se pudo setear minedState=${blockDef.minedBlockId} en ${key}`);
-				if (isTargetTrace) tell(player, "§c[mining] mined-state FAIL (no se puede aplicar)");
-				return false;
+				const didSetMinedState = setBlockTypeSafe(dim, blockPos, blockDef.minedBlockId);
+				if (!didSetMinedState) {
+					dbg(config, `No se pudo setear minedState=${blockDef.minedBlockId} en ${key}`);
+					if (isTargetTrace) tell(player, "§c[mining] mined-state FAIL (no se puede aplicar)");
+					return false;
+				}
 			}
 			if (isTargetTrace) tell(player, "§a[mining] mined-state=ok");
 
-			let selected = selectActiveModifier(blockDef, {
-				player,
-				blockDef,
-				dimensionId,
-				blockPos,
-				areas: Array.isArray(config?.areas) ? config.areas : [],
-			});
+			let selected = selectedOverride;
+			if (!selected) {
+				selected = selectActiveModifier(blockDef, {
+					player,
+					blockDef,
+					dimensionId,
+					blockPos,
+					areas: Array.isArray(config?.areas) ? config.areas : [],
+				});
 
-			if (!selected && blockDef.fortuneTiers) {
-				selected = resolveFortuneResult(blockDef.fortuneTiers, player);
+				if (!selected && blockDef.fortuneTiers) {
+					selected = resolveFortuneResult(blockDef.fortuneTiers, player);
+				}
 			}
 
 			const dropsTable = resolveDropsTable(blockDef, selected);
@@ -707,7 +819,8 @@ export function initMiningRegen(userConfig) {
 			if (xpRule && xpGain && xpGain.gain > 0) {
 				const gainObjective = String(xpRule.gainObjective ?? "").trim();
 				if (gainObjective) xpAdds = { [gainObjective]: xpGain.gain };
-				emitXpTitleBestEffort(config, player, blockDef, selected, xpRule, xpGain);
+				if (xpTitleBatch) accumulateXpTitleBatch(xpTitleBatch, config, player, blockDef, selected, xpRule, xpGain);
+				else emitXpTitleBestEffort(config, player, blockDef, selected, xpRule, xpGain);
 			}
 
 			const merged = mergeScoreboardAdds(mergeScoreboardAdds(mergeScoreboardAdds(globalAdds, blockAdds), modifierAdds), xpAdds);
@@ -727,7 +840,7 @@ export function initMiningRegen(userConfig) {
 			});
 
 			if (allowSpread) {
-				const spreadTargets = resolveSpreadTargets({
+				const spreadPlan = resolveSpreadTargets({
 					player,
 					dimension: dim,
 					dimensionId,
@@ -745,8 +858,11 @@ export function initMiningRegen(userConfig) {
 					isInAnyArea,
 					getBlockDefinition,
 				});
+				const spreadTargets = Array.isArray(spreadPlan?.targets) ? spreadPlan.targets : [];
+				const spreadConfig = spreadPlan?.spread && typeof spreadPlan.spread === "object" ? spreadPlan.spread : null;
 
 				for (const target of spreadTargets) {
+					playSpreadBurstSoundBestEffort(config, player, dim, target.pos, target.blockDef, spreadConfig);
 					processingKeys.add(target.key);
 					processResolvedBlockBreak({
 						player,
@@ -757,6 +873,8 @@ export function initMiningRegen(userConfig) {
 						blockDef: target.blockDef,
 						key: target.key,
 						allowSpread: false,
+						selectedOverride: selected,
+						xpTitleBatch,
 					});
 				}
 			}
@@ -904,7 +1022,13 @@ export function initMiningRegen(userConfig) {
 			// En modo trace, mostramos qué ruta se usó.
 			playMineSoundBestEffort(config, player, dim, blockPos, blockDef, isTargetTrace);
 
+			// Mitigación visual/física: intentamos reemplazar el bloque en este mismo before-event.
+			// Si la API/versión no lo permite, el procesamiento diferido mantiene el fallback actual.
+			const minedStatePreApplied = setBlockTypeSafe(dim, blockPos, blockDef.minedBlockId);
+			if (isTargetTrace && minedStatePreApplied) tell(player, "§a[mining] mined-state preapply=ok");
+
 			system.run(() => {
+				const xpTitleBatch = makeXpTitleBatch();
 				try {
 					processResolvedBlockBreak({
 						player,
@@ -916,9 +1040,13 @@ export function initMiningRegen(userConfig) {
 						key,
 						isTargetTrace,
 						allowSpread: true,
+						minedStatePreApplied,
+						xpTitleBatch,
 					});
 				} catch (e) {
 					void e;
+				} finally {
+					flushXpTitleBatch(xpTitleBatch);
 				}
 			});
 		} catch (e) {

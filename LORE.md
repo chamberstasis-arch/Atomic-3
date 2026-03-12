@@ -19,4 +19,8 @@ Los Siete se fragmentaron tras la guerra, no muertos pero si vagando por el mund
 
 "Por eso; podrías ser el único aquí, o simplemente el último."
 
-Sin inmutarte no le diste importancia y bajo la luz del sol empuñaste tu palo y golpeaste un arbol en busqueda de madera
+Sin inmutarte no le diste importancia y bajo la luz del sol empuñaste tu palo y golpeaste un arbol en busqueda de madera, extrajiste los minerales sin inmutarte por aquel sujeto ni por la historia de aquel mundo, con los materiales usando habilidades desconocidas creaste herramientas mejores y un barco con el cual te moviste hacia la siguiente isla
+
+"Cuentame ¿Cómo sabes hacer eso?, se nota que eres de otro mundo ¿verdad? aquí tenemos algo parecido llamado "permutación" que nos permite alterar la materia atraves de "energía pura" y transmutar un material a otro con ciertas restricciones... pero eso que tú haces es superior en todo aspecto"
+
+Llegaste a la isla y bastante más grande que la anterior tenía varias estructuras abandonadas pero no parecian desgastadas por el paso del tiempo, parecian extrañamente cuidadas y mantenidas, 

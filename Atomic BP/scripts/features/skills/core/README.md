@@ -109,8 +109,8 @@ export const foragingSkillDefinition = {
     perLevel: 4
   },
   levels: [
-    { level: 1, xpRequired: 0 },
-    { level: 2, xpRequired: 20 }
+      { level: 1, xpRequired: 0 },
+      { level: 2, xpRequired: 20, sound: "note.pling", particle: "minecraft:totem_particle" }
   ],
   presentation: {
     levelUpMessage: [
@@ -135,6 +135,34 @@ export const foragingSkillDefinition = {
 - `rewards`
 - `presentation`
 - `debug`
+
+### Efectos visuales de subida de nivel
+
+El `core/` reproduce por defecto en cada level up:
+
+- Sonido: `random.levelup`
+- Partícula: `minecraft:totem_particle`
+
+Cada nivel puede sobrescribirlos con campos simples en la entrada del nivel:
+
+```js
+{ level: 5, xpRequired: 260, sound: "note.pling", particle: "minecraft:happy_villager_particle" }
+```
+
+También acepta formato objeto para personalizar volumen, pitch, cantidad u offset:
+
+```js
+{
+   level: 10,
+   xpRequired: 1460,
+   sound: { id: "note.pling", volume: 0.8, pitch: 1.25 },
+   particle: {
+      id: "minecraft:totem_particle",
+      count: 6,
+      offset: { x: 0, y: 0.5, z: 0 }
+   }
+}
+```
 
 ---
 

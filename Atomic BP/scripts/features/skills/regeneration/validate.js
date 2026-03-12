@@ -112,10 +112,19 @@ function validateSpreadConfig(spread, label, warnings) {
 	if (spread.maxVisitedBlocks != null && (!isFiniteNumber(spread.maxVisitedBlocks) || Number(spread.maxVisitedBlocks) <= 0)) {
 		warnings.push(`${label}: spread.maxVisitedBlocks debería ser > 0`);
 	}
+	if (spread.randomness != null && (!isFiniteNumber(spread.randomness) || Number(spread.randomness) < 0 || Number(spread.randomness) > 1)) {
+		warnings.push(`${label}: spread.randomness debería estar entre 0 y 1`);
+	}
 	if (spread.matchMode != null) {
 		const matchMode = asStr(spread.matchMode).toLowerCase();
 		if (matchMode && matchMode !== "same-block-type" && matchMode !== "same-definition" && matchMode !== "same-skill") {
 			warnings.push(`${label}: spread.matchMode debería ser 'same-block-type', 'same-definition' o 'same-skill'`);
+		}
+	}
+	if (spread.sound != null) {
+		if (!isObj(spread.sound)) warnings.push(`${label}: spread.sound debería ser un objeto`);
+		else if (spread.sound.pitchJitter != null && (!isFiniteNumber(spread.sound.pitchJitter) || Number(spread.sound.pitchJitter) < 0 || Number(spread.sound.pitchJitter) > 1)) {
+			warnings.push(`${label}: spread.sound.pitchJitter debería estar entre 0 y 1`);
 		}
 	}
 }

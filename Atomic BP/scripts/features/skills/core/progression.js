@@ -1,5 +1,8 @@
 import { asStr, getScoreBestEffort, setScoreBestEffort, toInt } from "./scoreboards.js";
 
+const DEFAULT_LEVEL_UP_SOUND = Object.freeze({ id: "random.levelup", volume: 1, pitch: 1 });
+const DEFAULT_LEVEL_UP_PARTICLE = Object.freeze({ id: "minecraft:totem_particle", count: 1, offset: { x: 0, y: 0, z: 0 } });
+
 function toRoman(value) {
 	let n = toInt(value, 0);
 	if (n <= 0 || n > 3999) return String(value);
@@ -32,6 +35,44 @@ function normalizeTitleColor(value) {
 	const color = asStr(value);
 	if (!color) return "";
 	return /^§[0-9a-f]$/i.test(color) ? color : "";
+}
+
+function normalizeSoundEffect(value, fallback = DEFAULT_LEVEL_UP_SOUND) {
+	if (value === false) return false;
+	if (typeof value === "string") {
+		const id = asStr(value);
+		return id ? { ...fallback, id } : { ...fallback };
+	}
+	if (!value || typeof value !== "object") return { ...fallback };
+	const id = asStr(value.id ?? value.minecraftId ?? fallback.id);
+	if (!id) return { ...fallback };
+	const volume = Number.isFinite(Number(value.volume)) ? Number(value.volume) : fallback.volume;
+	const pitch = Number.isFinite(Number(value.pitch)) ? Number(value.pitch) : fallback.pitch;
+	return {
+		id,
+		volume: Math.max(0, Math.min(4, volume)),
+		pitch: Math.max(0, Math.min(2, pitch)),
+	};
+}
+
+function normalizeParticleEffect(value, fallback = DEFAULT_LEVEL_UP_PARTICLE) {
+	if (value === false) return false;
+	if (typeof value === "string") {
+		const id = asStr(value);
+		return id ? { ...fallback, id, offset: { ...fallback.offset } } : { ...fallback, offset: { ...fallback.offset } };
+	}
+	if (!value || typeof value !== "object") return { ...fallback, offset: { ...fallback.offset } };
+	const id = asStr(value.id ?? value.particleId ?? fallback.id);
+	if (!id) return { ...fallback, offset: { ...fallback.offset } };
+	const count = Math.max(1, Math.min(32, toInt(value.count, fallback.count)));
+	const offsetRaw = value.offset && typeof value.offset === "object" ? value.offset : {};
+	const baseOffset = fallback.offset && typeof fallback.offset === "object" ? fallback.offset : { x: 0, y: 0, z: 0 };
+	const offset = {
+		x: Number.isFinite(Number(offsetRaw.x)) ? Number(offsetRaw.x) : baseOffset.x,
+		y: Number.isFinite(Number(offsetRaw.y)) ? Number(offsetRaw.y) : baseOffset.y,
+		z: Number.isFinite(Number(offsetRaw.z)) ? Number(offsetRaw.z) : baseOffset.z,
+	};
+	return { id, count, offset };
 }
 
 function normalizeRequirement(req) {
@@ -148,12 +189,19 @@ function normalizeLevelEntry(entry, index, maxLevel, options = {}) {
 		if (oneAward) messageAwards = [oneAward];
 	}
 
+	const sound = normalizeSoundEffect(entry.sound, DEFAULT_LEVEL_UP_SOUND);
+	const particle = normalizeParticleEffect(entry.particle, DEFAULT_LEVEL_UP_PARTICLE);
+
 	return {
 		id: asStr(entry.id) || `level_${index + 1}`,
 		level,
 		xpRequired,
 		titleColor: normalizeTitleColor(entry.titleColor),
 		requirements,
+		effects: {
+			sound,
+			particle,
+		},
 		rewards: {
 			scoreboardAdds: addsMerged,
 			messageAwards,
@@ -306,6 +354,58 @@ function sendMessageLines(player, lines) {
 	}
 }
 
+function isSafeCommandToken(token) {
+	return /^[0-9A-Za-z_:\.-]+$/.test(String(token != null ? token : ""));
+}
+
+function emitLevelChangeSound(player, sound) {
+	if (!player || sound === false) return;
+	const resolved = normalizeSoundEffect(sound, DEFAULT_LEVEL_UP_SOUND);
+	if (!resolved || resolved === false) return;
+	try {
+		if (typeof player.playSound === "function") {
+			player.playSound(resolved.id, { volume: resolved.volume, pitch: resolved.pitch });
+			return;
+		}
+		const dim = player.dimension;
+		const loc = player.location;
+		if (dim && loc && typeof dim.playSound === "function") {
+			dim.playSound(resolved.id, loc, { volume: resolved.volume, pitch: resolved.pitch });
+			return;
+		}
+		if (typeof player.runCommandAsync === "function" && isSafeCommandToken(resolved.id)) {
+			player.runCommandAsync(`playsound ${resolved.id} @s ~~~ ${resolved.volume} ${resolved.pitch}`);
+		}
+	} catch (e) {
+		void e;
+	}
+}
+
+function emitLevelChangeParticles(player, particle) {
+	if (!player || particle === false) return;
+	const resolved = normalizeParticleEffect(particle, DEFAULT_LEVEL_UP_PARTICLE);
+	if (!resolved || resolved === false) return;
+	try {
+		const dim = player.dimension;
+		const loc = player.location;
+		if (!dim || !loc) return;
+		const spawnAt = {
+			x: loc.x + resolved.offset.x,
+			y: loc.y + resolved.offset.y,
+			z: loc.z + resolved.offset.z,
+		};
+		if (typeof dim.spawnParticle === "function") {
+			for (let i = 0; i < resolved.count; i++) dim.spawnParticle(resolved.id, spawnAt);
+			return;
+		}
+		if (typeof player.runCommandAsync === "function" && isSafeCommandToken(resolved.id)) {
+			for (let i = 0; i < resolved.count; i++) player.runCommandAsync(`particle ${resolved.id} ~~~`);
+		}
+	} catch (e) {
+		void e;
+	}
+}
+
 export function normalizeSkillDefinition(definition, skillIdFallback = "") {
 	if (!definition || typeof definition !== "object") return null;
 	const id = asStr(definition.id || skillIdFallback).toLowerCase();
@@ -323,6 +423,8 @@ export function normalizeSkillDefinition(definition, skillIdFallback = "") {
 		: (ctx) => buildDefaultLevelLabel(ctx.definition, ctx.levelDef, ctx.level);
 	const buildMessagePayload = typeof presentation.buildMessagePayload === "function" ? presentation.buildMessagePayload : null;
 	const sendLevelChangeMessage = typeof presentation.sendLevelChangeMessage === "function" ? presentation.sendLevelChangeMessage : null;
+	const levelUpSound = normalizeSoundEffect(presentation.levelUpSound ?? definition.levelUpSound, DEFAULT_LEVEL_UP_SOUND);
+	const levelUpParticle = normalizeParticleEffect(presentation.levelUpParticle ?? definition.levelUpParticle, DEFAULT_LEVEL_UP_PARTICLE);
 
 	return {
 		id,
@@ -341,6 +443,8 @@ export function normalizeSkillDefinition(definition, skillIdFallback = "") {
 		buildLevelLabel,
 		buildMessagePayload,
 		sendLevelChangeMessage,
+		levelUpSound,
+		levelUpParticle,
 		notifyOnLevelDown: runtime.notifyOnLevelDown === true,
 		preserveHigherPrimary: runtime.preserveHigherPrimary === true,
 		initializeOnJoin: runtime.initializeOnJoin !== false,
@@ -420,6 +524,10 @@ export function reconcileSkillForDefinition(definition, player, source = "manual
 		const lines = renderLevelChangeMessage(definition, payload, levelDef);
 		if (definition.sendLevelChangeMessage) definition.sendLevelChangeMessage({ definition, player, lines, payload, levelDef, source });
 		else sendMessageLines(player, lines);
+		if (resolvedLevel > previousLevel) {
+			emitLevelChangeSound(player, levelDef?.effects?.sound ?? definition.levelUpSound);
+			emitLevelChangeParticles(player, levelDef?.effects?.particle ?? definition.levelUpParticle);
+		}
 	}
 
 	return true;

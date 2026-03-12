@@ -48,6 +48,8 @@
  *  tiers: FortuneTierEntry[],
  * }} FortuneTiersConfig
  *
+ * @typedef {{ enabled?: boolean, pitchJitter?: number }} SpreadSoundConfig
+ *
  * @typedef {{
  *  id: string,
  *  // Identificador de skill asociada al bloque (ej: "mining", "farming", "foraging", ...)
@@ -87,6 +89,20 @@
  *  // Reemplaza modifiers de rango para fortuna. Cada tier define drops para un umbral.
  *  // fortune % step = probabilidad de obtener el tier superior (interpolación lineal).
  *  fortuneTiers?: FortuneTiersConfig,
+ *  // Propagación por bloques adyacentes. También puede reproducir sonido adicional por bloque afectado.
+ *  // randomness: 0..1 altera el orden de exploración para que el patrón sea menos predecible.
+ *  // sound.enabled: reproduce un burst adicional por cada bloque extra afectado.
+ *  // sound.pitchJitter: variación aleatoria del pitch por bloque extra para evitar repetición plana.
+ *  spread?: {
+ *    enabled?: boolean,
+ *    objective?: string,
+ *    pointsPerExtra?: number,
+ *    maxExtraBlocks?: number,
+ *    maxVisitedBlocks?: number,
+ *    matchMode?: string,
+ *    randomness?: number,
+ *    sound?: SpreadSoundConfig,
+ *  },
  *  // XP de skill (independiente de fortuna). Se aplica siempre que se mine el bloque.
  *  // Escala con scalingObjective (ej: ExpMinTotalH) pero NO varía por tier de fortuna.
  *  xp?: { base:number, scalingObjective:string, gainObjective?:string, levelObjective?:string, stepPerPoints?:number },
@@ -126,6 +142,11 @@ export const skillRegenConfig = {
 			maxExtraBlocks: 12,
 			maxVisitedBlocks: 128,
 			matchMode: "same-block-type",
+			randomness: 0.35,
+			sound: {
+				enabledByDefault: true,
+				pitchJitter: 0.08,
+			},
 		},
 		particles: {
 			// Keys de modifiers que disparan particlesOnSilkTouch.
@@ -296,6 +317,16 @@ export const skillRegenConfig = {
 					},
 				],
 			},
+			spread: {
+				enabled: false,
+				randomness: 0.2,
+				sound: {
+					enabled: true,
+					pitchJitter: 0.04,
+				},
+				// objective futuro sugerido para cuando exista la stat de expansión minera.
+				// objective: "FrenMinTotalH",
+			},
 			// Modifiers vacío: reservado para overrides especiales (ej: silk touch)
 			modifiers: [],
 		}
@@ -313,6 +344,11 @@ export const skillRegenConfig = {
 				maxExtraBlocks: 16,
 				maxVisitedBlocks: 196,
 				matchMode: "same-block-type",
+				randomness: 0.45,
+				sound: {
+					enabled: true,
+					pitchJitter: 0.1,
+				},
 			},
 			// mined-state específico para este bloque
 			minedBlockId: "minecraft:brown_terracotta",
@@ -320,6 +356,21 @@ export const skillRegenConfig = {
 			sounds: [{ id: "dig.wood", volume: 1, pitch: 1 }],
 			scoreboardAddsOnBreak: {
 				TRONCOS: 1,
+			},
+			xp: {
+				base: 8,
+				scalingObjective: "ExpTalTotalH",
+				gainObjective: "SkillXpTala",
+				levelObjective: "SkillLvlTala",
+				stepPerPoints: 10,
+			},
+			xpTitle: {
+				enabled: true,
+				source: "regen_xp",
+				id: "foraging_xp",
+				priority: 40,
+				durationTicks: 40,
+				content: ["§3+${xpGain} ${xpActual}/${xpRequeriment}"],
 			},
 			drops: [
 				[1, "minecraft:oak_log", 1, 1, 50, "MaderaTest", ["Madera."]],
@@ -340,21 +391,6 @@ export const skillRegenConfig = {
 							[1, "minecraft:oak_log", 1, 2, 65, "MaderaTest", ["§7Fortuna Tala A"]],
 							[2, "minecraft:oak_leaves", 1, 4, 40, "Hojitas", ["§7Fortuna Tala A"]],
 						],
-						xp: {
-							base: 6,
-							scalingObjective: "ExpTalTotalH",
-							gainObjective: "SkillXpTala",
-							levelObjective: "SkillLvlTala",
-							stepPerPoints: 10,
-						},
-						title: {
-							enabled: true,
-							source: "regen_xp",
-							id: "foraging_xp_a",
-							priority: 35,
-							durationTicks: 30,
-							content: ["§3+${xpGain}"],
-						},
 					},
 				},
 			],
@@ -371,6 +407,16 @@ export const skillRegenConfig = {
 			minedBlockId: "minecraft:air",
 			regenSeconds: 12,
 			sounds: [{ id: "dig.grass", volume: 0.8, pitch: 1.1 }],
+			spread: {
+				enabled: false,
+				randomness: 0.3,
+				sound: {
+					enabled: true,
+					pitchJitter: 0.06,
+				},
+				// objective futuro sugerido para cuando exista la stat de expansión de cosecha.
+				// objective: "FrenCosTotalH",
+			},
 			scoreboardAddsOnBreak: {
 				ZANAHORIAS: 1,
 			},

@@ -8,7 +8,24 @@ function toInt(value, fallback = 0) {
 	return Math.trunc(n);
 }
 
-function normalizeSpreadConfig(rawSpread, rawDefaults = {}) {
+function clamp01(value, fallback = 0) {
+	const n = Number(value);
+	if (!Number.isFinite(n)) return fallback;
+	return Math.max(0, Math.min(1, n));
+}
+
+function normalizeSpreadSoundConfig(rawSound, rawDefaults = {}) {
+	const defaults = rawDefaults && typeof rawDefaults === "object" ? rawDefaults : {};
+	const sound = rawSound && typeof rawSound === "object" ? rawSound : {};
+	const enabled = sound.enabled !== false && (sound.enabled === true || defaults.enabledByDefault === true);
+	const pitchJitter = clamp01(sound.pitchJitter ?? defaults.pitchJitter, 0);
+	return {
+		enabled,
+		pitchJitter,
+	};
+}
+
+export function normalizeSpreadConfig(rawSpread, rawDefaults = {}) {
 	const defaults = rawDefaults && typeof rawDefaults === "object" ? rawDefaults : {};
 	const spread = rawSpread && typeof rawSpread === "object" ? rawSpread : {};
 	const objective = asStr(spread.objective ?? defaults.objective);
@@ -17,6 +34,8 @@ function normalizeSpreadConfig(rawSpread, rawDefaults = {}) {
 	const maxVisitedBlocks = Math.max(maxExtraBlocks || 0, toInt(spread.maxVisitedBlocks ?? defaults.maxVisitedBlocks, 128));
 	const matchMode = asStr(spread.matchMode ?? defaults.matchMode).toLowerCase() || "same-block-type";
 	const enabled = spread.enabled !== false && (spread.enabled === true || defaults.enabledByDefault === true);
+	const randomness = clamp01(spread.randomness ?? defaults.randomness, 0);
+	const sound = normalizeSpreadSoundConfig(spread.sound, defaults.sound);
 	return {
 		enabled,
 		objective,
@@ -24,7 +43,19 @@ function normalizeSpreadConfig(rawSpread, rawDefaults = {}) {
 		maxExtraBlocks,
 		maxVisitedBlocks,
 		matchMode,
+		randomness,
+		sound,
 	};
+}
+
+function shuffleInPlace(list) {
+	for (let i = list.length - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1));
+		const tmp = list[i];
+		list[i] = list[j];
+		list[j] = tmp;
+	}
+	return list;
 }
 
 function getOrthogonalNeighbors(pos) {
@@ -56,19 +87,24 @@ function matchesSpreadTarget(candidateDef, originBlockDef, candidateBlockTypeId,
 
 export function resolveSpreadTargets(context) {
 	const spread = normalizeSpreadConfig(context?.blockDef?.spread, context?.spreadDefaults);
-	if (!spread.enabled || !spread.objective || spread.maxExtraBlocks <= 0) return [];
+	if (!spread.enabled || !spread.objective || spread.maxExtraBlocks <= 0) return { targets: [], spread };
 
 	const statValue = context?.getScoreBestEffort?.(context.player, spread.objective) ?? 0;
 	const extraBreaks = computeExtraBreaks(statValue, spread.pointsPerExtra, spread.maxExtraBlocks);
-	if (extraBreaks <= 0) return [];
+	if (extraBreaks <= 0) return { targets: [], spread };
 
 	const queue = [context.originPos];
 	const visited = new Set([context.makeKeyFromPos(context.dimensionId, context.originPos)]);
 	const out = [];
 
 	while (queue.length > 0 && out.length < extraBreaks && visited.size <= spread.maxVisitedBlocks) {
-		const current = queue.shift();
-		for (const neighbor of getOrthogonalNeighbors(current)) {
+		const currentIndex = queue.length > 1 && spread.randomness > 0 && Math.random() < spread.randomness
+			? Math.floor(Math.random() * queue.length)
+			: 0;
+		const [current] = queue.splice(currentIndex, 1);
+		const neighbors = getOrthogonalNeighbors(current);
+		if (spread.randomness > 0) shuffleInPlace(neighbors);
+		for (const neighbor of neighbors) {
 			const key = context.makeKeyFromPos(context.dimensionId, neighbor);
 			if (visited.has(key)) continue;
 			visited.add(key);
@@ -87,5 +123,5 @@ export function resolveSpreadTargets(context) {
 		}
 	}
 
-	return out;
+	return { targets: out, spread };
 }

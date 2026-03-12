@@ -444,8 +444,14 @@ Antes de extender mineria a tala o cosecha, debe existir un `core/` con responsa
 
 - Resolver progreso por `skillId`.
 - Calcular siguiente requisito de XP.
-- Reconciliar rewards por nivel.
+- Reconciliar nivel y reward principal por politica de skill.
 - Exponer hooks reutilizables para scoreboards aplicados desde `regeneration/`.
+
+Nota de estado actual:
+
+- El runtime vigente del `core/` ya cubre `mining/` y `foraging/`.
+- Las rewards aditivas por nivel siguen una politica incremental en subidas y no se revierten automaticamente al bajar.
+- El objective principal puede preservarse en maximo historico si la skill activa `preserveHigherPrimary`.
 
 Este paso es el que evita copiar `mining/` hacia `foraging/`.
 
@@ -796,7 +802,8 @@ Esta tabla resume la direccion arquitectonica que debe respetarse despues de la 
 
 ### Caso 5. Admin modifica XP o nivel por comando
 
-- `core/` debe reconciliar rewards persistentes sin dejar desincronizaciones.
+- `core/` recalcula el nivel y aplica la politica actual de rewards de la skill.
+- Si la skill preserva reward principal o usa rewards aditivas incrementales, eso debe asumirse como comportamiento vigente hasta nuevo refactor.
 
 ---
 

@@ -24,10 +24,10 @@ Estado actual:
 - `runtime.particles.triggerModifierKeys`: keys de modifiers que disparan `particlesOnSilkTouch`.
 - `runtime.titles`:
   - `enabledByDefault`, `source`, `priority`, `durationTicks`, `contentTemplate`.
-  - `provisional.requirementPerLevel`: base provisional para requerimiento de siguiente nivel.
-  - `progressObjectivesBySkill`: separación de scoreboards por skill.
+  - `noLevelsContentTemplate`: fallback visual cuando no existe catálogo consumible de la skill.
+  - `progressObjectivesBySkill`: fallback de objectives por skill cuando la definición aún no está registrada en `core/`.
 
-### Objectives por skill (provisional)
+### Objectives por skill
 Por defecto, el sistema usa:
 - `mining`: `SkillXpMineria`, `SkillLvlMineria`
 - `foraging`: `SkillXpTala`, `SkillLvlTala`
@@ -68,6 +68,7 @@ Regla actual:
 - `extras = floor(score / pointsPerExtra) + probabilidad(residuo / pointsPerExtra)`
 - La búsqueda usa vecinos ortogonales en 6 direcciones.
 - Si `randomness > 0`, el frente de búsqueda y el orden de vecinos se mezclan parcialmente.
+- `resolveSpreadTargets()` devuelve tanto los targets como la configuración normalizada usada en el evento.
 - El primer consumidor activo es `foraging` con `FrenTalTotalH`.
 
 ### Sonido por spread
@@ -88,26 +89,33 @@ El bloque origen mantiene su sonido normal; los bloques extra agregan repeticion
 - `mining`: contrato de spread preparado pero desactivado hasta que exista la stat futura.
 - `farming`: contrato de spread preparado pero desactivado hasta que exista la stat futura.
 
-## XP gain y progress provisional
+## XP gain y progreso visual actual
 ### Ganancia por evento
 `resolveXpGain` calcula:
 - `multiplier = max(1, 1 + floor(stat / stepPerPoints))`
 - `xpGain = base * multiplier`
 
-### Progress provisional para title
+### Titles de XP
 Al renderizar title, se calculan placeholders:
 - `${xpGain}`: XP ganada en el evento.
-- `${xpActual}`: XP después del evento (`scoreActual + xpGain`).
-- `${xpRequeriment}`: requerimiento provisional para siguiente nivel.
+- `${xpActual}`: XP visible después del evento o del batch acumulado.
+- `${xpRequeriment}`: requerimiento del siguiente nivel consultado desde `core/`.
 - `${xpRequirement}`: alias equivalente.
 - `${skill}`: skill normalizada (`mining`, `foraging`, `farming`).
 
-Fórmula provisional:
-- `xpRequeriment = max(base, (nivelActual + 1) * base)`
-- `base = runtime.titles.provisional.requirementPerLevel` (default `50`).
+Resolución actual:
+
+- `regeneration/` intenta resolver `xpObjective` y `levelObjective` en este orden:
+  1. `effects.xp.gainObjective` y `effects.xp.levelObjective`
+  2. `runtime.titles.progressObjectivesBySkill`
+  3. La definición registrada en `skills/core/`
+- El requerimiento visible se obtiene con `getSkillNextXpRequirement(skillId, currentLevel)`.
+- Si la skill no tiene catálogo consumible o ya no tiene siguiente nivel, el sistema usa `runtime.titles.noLevelsContentTemplate`.
+
+En eventos con spread, el title se acumula por `skill|source|id` y se hace un solo `flush` al final del procesamiento para evitar spam de un title por cada bloque extra.
 
 Ejemplo (`content: ["+${xpGain} ${xpActual}/${xpRequeriment}"]`):
-- `SkillXpMineria=0`, `SkillLvlMineria=0`, `xpGain=8` => `+8 8/50`.
+- `SkillXpMineria=0`, `SkillLvlMineria=1`, `xpGain=8` => `+8 8/20` si el catálogo de `core/` define nivel 2 con `20` XP.
 
 ## Seguridad y hardening aplicados
 - Fallback por comando para scoreboards valida objective token antes de ejecutar comando.

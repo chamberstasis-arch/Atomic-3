@@ -1,6 +1,6 @@
 # Skill Mining — Especificación de Niveles (v1)
 
-Documento de diseño para la skill de minería por niveles.
+Documento de diseño y referencia del comportamiento actual para la skill de minería por niveles.
 
 Objetivo: definir una lógica clara, configurable y lista para implementar en scripts, sin ambigüedades de reglas.
 
@@ -18,7 +18,7 @@ Este documento cubre:
 - Conversión a números romanos para mostrar niveles.
 - Integración con el sistema actual de minería/regeneración.
 
-Este documento no implementa código.
+Este documento no implementa código, pero sí debe reflejar el runtime vigente cuando difiera de la propuesta ideal.
 
 ---
 
@@ -84,11 +84,17 @@ Si el jugador tiene XP suficiente pero no cumple Acto, no sube a ese nivel.
 - El nivel depende únicamente de la XP y requisitos del nivel.
 - Las recompensas activas dependen del nivel actual resuelto.
 - Si el nivel sube, se aplican recompensas del nuevo rango alcanzado.
-- Si el nivel baja (porque bajó la XP), se retiran recompensas de niveles ya no alcanzados.
+- Si el nivel baja, el scoreboard de nivel sí se recalcula, pero la política de rewards depende de la configuración real de la skill.
 
 Regla clave:
 
 - XP cambia -> se recalcula nivel -> se reconcilian recompensas.
+
+Estado actual del runtime:
+
+- `FortMinPersonalH` se trata como reward principal y la configuración vigente usa `preserveHigherFortune=true`.
+- Eso hace que la fortuna principal no se reduzca automáticamente al bajar de nivel por XP o por requisitos administrativos.
+- Las rewards secundarias declaradas con `scoreboardAddD`, `scoreboardAdd` o `rewards.scoreboardAdds` se aplican en level up, pero hoy no se retiran automáticamente cuando el nivel baja.
 
 ---
 
@@ -188,7 +194,7 @@ Proceso:
 4. Elegir el nivel alcanzable más alto.
 5. Reconciliar recompensas según diferencia de nivel:
     - Si sube: aplicar recompensas de los niveles nuevos.
-    - Si baja: retirar recompensas de niveles ya no alcanzados.
+    - Si baja: actualizar el `SkillLvlMineria`; la reducción de rewards depende de la política configurada y hoy no existe rollback automático de rewards aditivas.
 6. Actualizar SkillLvlMineria al nivel final resuelto.
 7. Emitir mensaje de cambio de nivel según política final.
 
@@ -198,12 +204,12 @@ Comportamiento recomendado para saltos múltiples:
     - PreviousLevel = 1
     - NextLevel = 4
 
-Política de recompensas recomendada (idempotente):
+Política implementada hoy:
 
-- En lugar de aplicar/restar incrementos acumulativos por eventos, calcular valor objetivo por fórmula.
-- Para Fortuna Minera por nivel:
-    - `targetFortMin = SkillLvlMineria * 4`
-- Ajustar el scoreboard al target para evitar desincronización.
+- La reward principal usa `primaryObjective` + `primaryPerLevel`.
+- En la configuración actual de minería, `preserveHigherFortune=true` conserva el valor principal más alto alcanzado.
+- Las rewards secundarias de dinero o extras por nivel se siguen otorgando de forma incremental en subidas y saltos múltiples.
+- Si se busca reconciliación bidireccional completa, sigue siendo una mejora futura y no debe documentarse como comportamiento vigente.
 
 ---
 
@@ -292,8 +298,8 @@ Esto permite que mining levels sea independiente de la lógica de drops/regenera
 - XP negativa por error externo: clamp mínimo a 0.
 - Niveles mal configurados: desactivar subida y loggear warning de configuración.
 - Requisitos extra no válidos: ignorar ese nivel y registrar warning.
-- Bajada de XP por fuente externa: recalcular nivel hacia abajo y retirar recompensas de niveles no alcanzados.
-- Desincronización de recompensa (FortMin distinto al target): corregir al valor objetivo en reconciliación.
+- Bajada de XP por fuente externa: recalcular nivel hacia abajo; la reward principal y las aditivas se comportan según la política actual documentada arriba.
+- Desincronización de recompensa: hoy se garantiza nivel consistente y reward principal según `preserveHigherFortune`, no rollback completo de todos los objectives secundarios.
 
 ---
 
@@ -314,7 +320,8 @@ Esto permite que mining levels sea independiente de la lógica de drops/regenera
      - Al cumplir Acto, sube correctamente.
 6. Bajada de XP (simulada por admin):
     - Baja nivel si corresponde.
-    - Se ajusta Fortuna Minera al valor del nuevo nivel.
+    - `FortMinPersonalH` puede conservar el máximo histórico con la configuración actual.
+    - Las rewards secundarias ya otorgadas no se revierten automáticamente.
 7. Nivel con recompensa especial (ej: nivel 20):
     - Mensaje incluye líneas extra en `<OtherAwards>`.
 
@@ -339,6 +346,6 @@ Esto permite que mining levels sea independiente de la lógica de drops/regenera
     - ["Habilidad mejorada!!!", "RECOMPENSAS", "+<PreviousFortune> -> <NextFortune> de Fortuna Minera", "<OtherAwards>"]
 - Visual de niveles en números romanos.
 - Recompensa base por nivel 1..60: `+4` a `FortMin` (acumulativa por nivel actual).
-- Si el nivel baja por XP, se retiran recompensas de niveles superiores automáticamente.
+- Si el nivel baja por XP, el nivel se recalcula, pero la política actual preserva la reward principal alta y no revierte automáticamente rewards secundarias.
 
 

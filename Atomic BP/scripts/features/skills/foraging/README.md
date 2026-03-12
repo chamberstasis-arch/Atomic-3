@@ -11,6 +11,7 @@ No describe un sistema aislado ni una copia de `mining/`. Su rol es declarar reg
 - `foraging/config.js` ya define scoreboards, niveles, rewards y mensajes de subida.
 - `foraging/index.js` ya registra la skill en `core/` y conserva una API publica simple.
 - `regeneration/` ya usa la skill por `skillId` y activa spread configurable con `FrenTalTotalH` en el bloque de prueba `oak log`.
+- El bloque de prueba actual ya usa `randomness: 0.45` y `spread.sound.enabled=true` para que la tala encadenada no sea lineal ni silenciosa.
 - Los objectives siguen registrandose desde `scripts/scoreboards/catalog.js`, no desde `foraging/`.
 
 ---
@@ -105,6 +106,7 @@ flowchart TD
 - Debe usar el helper global de `regeneration/spread.js`.
 - Cada 100 puntos garantizan un bloque extra.
 - El residuo porcentual define oportunidad del siguiente bloque.
+- El bloque de prueba vigente usa `matchMode: same-block-type`, `randomness: 0.45` y burst de sonido por bloque extra.
 
 ### 5.4 Experiencia de Talado
 
@@ -151,7 +153,8 @@ export const foragingSkillConfig = {
 - `level 1` debe existir con `xpRequired = 0`.
 - `levels` debe estar ordenado en ascendente.
 - `xpRequired` no puede decrecer.
-- Las rewards deben ser reconciliables por target, no por acumulados opacos.
+- La reward principal se rige por la politica `preserveHigherFortune`; en la configuracion actual se preserva el maximo historico alcanzado.
+- Las rewards secundarias declaradas como `scoreboardAdds` se aplican de forma incremental cuando el nivel sube; hoy no se reconstruyen automaticamente al bajar.
 
 ---
 
@@ -181,7 +184,9 @@ export const foragingSkillConfig = {
 
 ### Caso 5. Administrador cambia XP o nivel por comando
 
-- `core/` debe reconciliar rewards sin dejar desincronizado `FortTalPersonalH`.
+- `core/` recalcula `SkillLvlTala`.
+- `FortTalPersonalH` sigue la politica `preserveHigherFortune=true` de la skill actual.
+- Las rewards aditivas ya otorgadas no se retiran automaticamente si el nivel baja por un ajuste externo.
 
 ---
 
@@ -250,7 +255,7 @@ export const foragingSkillConfig = {
 
 4. Reducir XP por comando.
    Resultado esperado:
-   el nivel baja si corresponde y `FortTalPersonalH` se corrige al target de ese nivel.
+   el nivel baja si corresponde, pero `FortTalPersonalH` puede conservar el maximo historico y las rewards aditivas no se revierten automaticamente en la implementacion actual.
 
 ### Pruebas de integracion
 

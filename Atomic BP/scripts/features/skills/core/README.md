@@ -4,17 +4,17 @@
 
 Documento rector de `skills/core/`.
 
-Este modulo ya cuenta con una implementacion inicial operativa para la migracion de `mining/`, aunque el contrato sigue creciendo para cubrir `foraging/` y `farming/`.
+Este modulo ya funciona como runtime compartido de `mining/` y `foraging/`. El contrato ya es consumible en produccion del addon y sigue preparado para la futura entrada de `farming/`.
 
 ---
 
 ## 1. Objetivo
 
-`core/` sera el motor compartido de progresion para las skills que comparten el patron:
+`core/` es el motor compartido de progresion para las skills que comparten el patron:
 
 - Ganancia de XP por evento.
 - Resolucion de nivel por thresholds y requisitos.
-- Reconciliacion de recompensas persistentes.
+- Reconciliacion del nivel y de la reward principal por politica de skill.
 - Mensajeria de progreso y subida de nivel.
 - API comun para integrarse con `regeneration/` y con skills consumidoras.
 
@@ -28,10 +28,11 @@ El objetivo es eliminar duplicacion entre `mining/`, `foraging/` y `farming/` si
 
 - Resolver nivel actual de una skill.
 - Calcular XP requerida para el siguiente nivel.
-- Reconciliar rewards por nivel de forma idempotente.
+- Reconciliar nivel, objective principal y mensajes de cambio de nivel.
 - Proveer helpers para responder a scoreboards aplicados en runtime.
 - Exponer una API estable para skills consumidoras.
 - Trabajar por `skillId`, no por nombres hardcodeados de mineria.
+- Emitir sonido y particulas de subida de nivel cuando el catalogo lo define.
 
 `core/` no debe:
 
@@ -40,6 +41,17 @@ El objetivo es eliminar duplicacion entre `mining/`, `foraging/` y `farming/` si
 - Crear objectives de scoreboard.
 - Definir drops o bloques regenerables.
 - Hardcodear reglas exclusivas de una skill.
+
+## 2.1 Estado actual del runtime
+
+El comportamiento vigente del runtime debe leerse tal como esta implementado hoy:
+
+- `registerSkillDefinition()` esta pensado para bootstrap. Re-registrar una skill despues de activar su loop no reinicia el `runInterval` ya creado.
+- La reward principal puede preservarse al maximo historico cuando la skill define `runtime.preserveHigherPrimary=true`.
+- Las rewards aditivas declaradas en `rewards.scoreboardAdds` se aplican en subidas de nivel y saltos multiples hacia arriba.
+- Las rewards aditivas no se reconstruyen automaticamente hacia abajo cuando la XP o los requisitos administrativos hacen bajar el nivel.
+
+Esto significa que `core/` hoy resuelve correctamente XP, nivel, mensajes y reward principal segun politica, pero no debe documentarse como un reconciliador totalmente bidireccional para todos los objectives secundarios.
 
 ---
 
@@ -54,8 +66,9 @@ El objetivo es eliminar duplicacion entre `mining/`, `foraging/` y `farming/` si
 ### Salida esperada
 
 - Scoreboards de nivel actual.
-- Reconciliacion de rewards persistentes.
-- Payloads o hooks para titulos, chat o sistemas visuales.
+- Objective principal segun la politica activa de la skill.
+- Aplicacion incremental de rewards aditivas en level up.
+- Mensajes, sonidos y particulas de level up, o hooks custom si la skill los redefine.
 
 ### Regla de dependencia
 
@@ -68,9 +81,9 @@ Toda nueva necesidad de objective debe registrarse antes en:
 
 ---
 
-## 4. API publica objetivo
+## 4. API publica vigente
 
-El modulo debe tender a una API publica predecible.
+El modulo ya expone una API publica estable para consumo desde skills y motores globales.
 
 Contratos recomendados:
 
@@ -89,6 +102,7 @@ onSkillScoreboardsApplied(skillId, player, addsMap)
 - Evitar mezclar `default export` y `named exports` en el mismo contrato publico.
 - Exponer la API publica desde `core/index.js`.
 - Evitar que consumidores importen archivos internos salvo necesidad real de implementacion.
+- Tratar `registerSkillDefinition()` como operacion de arranque y no como hot-reload completo del runtime.
 
 ---
 
@@ -166,35 +180,37 @@ También acepta formato objeto para personalizar volumen, pitch, cantidad u offs
 
 ---
 
-## 6. Flujo funcional esperado
+## 6. Flujo funcional actual
 
 ```mermaid
 flowchart TD
     A[regeneration aplica addsMap] --> B[core identifica skillId]
     B --> C[core lee XP y level actuales]
     C --> D[core resuelve nuevo nivel]
-    D --> E[core reconcilia rewards]
-    E --> F[core devuelve payload visual]
-    F --> G[skill consumidora decide presentacion final]
+   D --> E[core ajusta level y objective principal segun politica]
+   E --> F[core aplica rewards aditivas si hubo level up]
+   F --> G[core emite mensaje y efectos o delega hook custom]
 ```
 
 ---
 
-## 7. Responsabilidades internas propuestas
+## 7. Responsabilidades internas
 
 ### `registry.js`
 
 - Registrar definiciones por `skillId`.
 - Validar shape minimo del contrato.
-- Evitar duplicados de skill.
+- Mantener una fuente simple de verdad por definicion registrada.
 
 ### `progression.js`
 
 - Resolver nivel alcanzable.
 - Calcular siguiente threshold.
 - Validar requirements adicionales.
-- Reconciliar rewards persistentes por nivel.
+- Aplicar reward principal por target segun configuracion.
+- Aplicar rewards aditivas en subidas de nivel.
 - Construir payloads de mensaje y placeholders de subida.
+- Emitir sonido y particulas de level up.
 
 ### `scoreboards.js`
 
@@ -241,6 +257,7 @@ flowchart TD
 - Rewards desincronizadas respecto al nivel actual.
 - Salto multiple de niveles en un solo evento.
 - Bajada de XP por comando o ajuste administrativo.
+- Re-registro accidental de una misma skill durante runtime.
 
 ---
 
@@ -272,7 +289,7 @@ flowchart TD
 
 5. Se reduce XP por comando.
    Resultado esperado:
-   el nivel baja si corresponde y la reward persistente queda corregida.
+   el nivel baja si corresponde. La reward principal sigue la politica `preserveHigherPrimary` de la skill y las rewards aditivas no se retiran automaticamente hacia abajo.
 
 ### Validaciones de robustez
 
@@ -296,10 +313,10 @@ flowchart TD
 - `regeneration/` deja de depender de `mining/` como caso especial.
 - Ninguna skill crea objectives por su cuenta.
 - La API publica del core es estable y facil de consumir.
-- Las pruebas manuales en Minecraft confirman progresion consistente y sin desincronizacion.
+- Las pruebas manuales en Minecraft confirman progresion consistente y documentan claramente la politica actual de rewards persistentes.
 
 ---
 
 ## 12. Siguiente paso recomendado
 
-Continuar con la entrada de `foraging/` como siguiente skill consumidora del core, manteniendo `regeneration/` desacoplado de reglas especificas de mineria.
+Formalizar `farming/` sobre el mismo contrato y decidir si la siguiente iteracion del core debe volver bidireccional la reconciliacion de rewards secundarias o mantener la politica incremental actual como decision de gameplay permanente.

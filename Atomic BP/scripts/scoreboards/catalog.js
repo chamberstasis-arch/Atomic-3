@@ -2,6 +2,7 @@ import { anticheatConfig } from "../features/anticheat/anticheat.config.js";
 import { damageCalcConfig } from "../features/skills/combat/calc/config.js";
 import { STAT_REGISTRY } from "../features/skills/lecture/statRegistry.js";
 import { foragingSkillConfig } from "../features/skills/foraging/config.js";
+import { farmingSkillConfig } from "../features/skills/farming/config.js";
 import { miningSkillConfig } from "../features/skills/mining/config.js";
 import { skillRegenConfig } from "../features/skills/regeneration/config.js";
 import achievementsConfig from "../features/achievements/config.js";
@@ -289,6 +290,7 @@ export function buildScoreboardCatalog() {
 	// --- Mining / levels (configurable) ---
 	addSkillProgressionObjectives(list, seen, miningSkillConfig);
 	addSkillProgressionObjectives(list, seen, foragingSkillConfig);
+	addSkillProgressionObjectives(list, seen, farmingSkillConfig);
 
 	// --- Systems / Titles Priority (configurable) ---
 	addTitlesPriorityObjectives(list, seen, titlesPriorityConfig);

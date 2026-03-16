@@ -24,12 +24,27 @@ function extractTotalNumber(normalizedLine) {
 	return parseNumberLoose(m[1]);
 }
 
+function normalizeScoreValue(stat, rawValue) {
+	const n = toNumberOr(rawValue, 0);
+	if (stat?.scale === "percent_to_1000") {
+		// Acepta dos formatos de lore:
+		// - porcentaje visual (50.2 => 502)
+		// - score directo (502 => 502)
+		const scaled = n <= 100 ? n * 10 : n;
+		const clamped = Math.max(0, Math.min(1000, scaled));
+		return floorFinite(clamped, 0);
+	}
+	if (stat?.x10) return floorFinite(n * 10, 0);
+	return floorFinite(n, 0);
+}
+
 /**
  * Parseo genérico: por stat.label al inicio de la línea normalizada.
  * Retorna el valor en representación de scoreboard:
  * - int: floor(n)
  * - float: floor(n)
  * - x10: floor(n * 10)
+ * - scale=percent_to_1000: n<=100 ? floor(n*10) : floor(n), luego clamp 0..1000
  */
 export function parseItemTotalsFromLore(loreLines, statRegistry) {
 	const lines = Array.isArray(loreLines) ? loreLines : [];
@@ -53,8 +68,7 @@ export function parseItemTotalsFromLore(loreLines, statRegistry) {
 			if (!line.toLowerCase().startsWith(label.toLowerCase())) continue;
 			const n = extractTotalNumber(line);
 			if (n == null) break;
-			if (stat.x10) value = floorFinite(toNumberOr(n, 0) * 10, 0);
-			else value = floorFinite(n, 0);
+			value = normalizeScoreValue(stat, n);
 			break;
 		}
 

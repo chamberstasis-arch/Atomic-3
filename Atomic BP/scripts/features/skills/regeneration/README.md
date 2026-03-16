@@ -47,6 +47,39 @@ Cada bloque define `modifiers` como array de reglas:
   - `xp` (`base`, `scalingObjective`, `gainObjective?`, `levelObjective?`, `stepPerPoints?`)
   - `title`
 
+## Mutación por bloque
+Cada bloque también puede declarar `mutation` para añadir drops especiales por probabilidad derivada de un scoreboard.
+
+Contrato soportado:
+
+- `enabled`: activa/desactiva la mutación del bloque.
+- `objective`: scoreboard leído para calcular la probabilidad.
+- `scoreMin`: mínimo efectivo (default `0`).
+- `scoreMax`: máximo efectivo (default `1000`).
+- `drops`: tabla de drops especiales que se agrega al resultado normal cuando la mutación atina.
+
+Regla actual:
+
+- `chance = clamp(score, scoreMin, scoreMax) / scoreMax`
+- Si atina, `mutation.drops` se concatena a `drops` normales.
+- Es un agregado, no un reemplazo.
+
+## Ciclo de crecimiento por bloque
+Para cultivos, cada bloque puede declarar `growthCycle` para exigir madurez antes de otorgar drops de cosecha.
+
+Contrato soportado:
+
+- `state`: nombre del block state de crecimiento (ej. `growth`).
+- `matureValue`: valor mínimo para considerar el cultivo cosechable.
+- `seedValue`: valor usado como estado temporal después de una cosecha válida.
+- `instantRestoreImmature`: si está activo, romper un cultivo inmaduro lo restaura al instante sin persistencia.
+
+Regla actual:
+
+- Si el cultivo no llega a `matureValue`, se cancela la cosecha y se restaura en el momento.
+- Si está maduro, se aplican drops/XP y el bloque pasa a `seedValue` durante `regenSeconds`.
+- Al finalizar `regenSeconds`, el bloque se restaura al estado maduro.
+
 ## Spread global por scoreboard
 Cada bloque puede declarar `spread` para propagar la rotura a vecinos ortogonales válidos.
 

@@ -129,6 +129,97 @@ function validateSpreadConfig(spread, label, warnings) {
 	}
 }
 
+function validateMutationConfig(mutation, label, warnings) {
+	if (mutation == null) return;
+	if (!isObj(mutation)) {
+		warnings.push(`${label}: mutation debería ser un objeto`);
+		return;
+	}
+	if (mutation.enabled !== false && !asStr(mutation.objective)) {
+		warnings.push(`${label}: mutation.objective es requerido cuando mutation.enabled=true`);
+	}
+	if (mutation.scoreMax != null && (!isFiniteNumber(mutation.scoreMax) || Number(mutation.scoreMax) <= 0)) {
+		warnings.push(`${label}: mutation.scoreMax debería ser > 0`);
+	}
+	if (mutation.scoreMin != null && (!isFiniteNumber(mutation.scoreMin) || Number(mutation.scoreMin) < 0)) {
+		warnings.push(`${label}: mutation.scoreMin debería ser >= 0`);
+	}
+	if (mutation.drops != null && !Array.isArray(mutation.drops)) {
+		warnings.push(`${label}: mutation.drops debería ser array`);
+		return;
+	}
+	const drops = Array.isArray(mutation.drops) ? mutation.drops : [];
+	for (const [j, d] of drops.entries()) {
+		if (!Array.isArray(d) || d.length < 5) {
+			warnings.push(`${label}: mutation.drops[${j}] inválido (esperado tuple [dropId,itemId,min,max,chance,...])`);
+			continue;
+		}
+		const itemId = asStr(d[1]);
+		if (!itemId) warnings.push(`${label}: mutation.drops[${j}] itemId vacío`);
+		const minQty = asNum(d[2]);
+		const maxQty = asNum(d[3]);
+		const chance = asNum(d[4]);
+		if (minQty == null || maxQty == null) warnings.push(`${label}: mutation.drops[${j}] min/max inválidos`);
+		if (chance == null || chance < 0 || chance > 100) warnings.push(`${label}: mutation.drops[${j}] chancePct debe ser 0..100`);
+	}
+}
+
+function validateGrowthCycleConfig(growthCycle, label, warnings) {
+	if (growthCycle == null) return;
+	if (!isObj(growthCycle)) {
+		warnings.push(`${label}: growthCycle debería ser un objeto`);
+		return;
+	}
+	if (!asStr(growthCycle.state)) warnings.push(`${label}: growthCycle.state es requerido`);
+	if (!isFiniteNumber(growthCycle.matureValue)) warnings.push(`${label}: growthCycle.matureValue debería ser numérico`);
+	if (!isFiniteNumber(growthCycle.seedValue)) warnings.push(`${label}: growthCycle.seedValue debería ser numérico`);
+}
+
+function validateCropProtectionConfig(cropProtection, label, warnings) {
+	if (cropProtection == null) return;
+	if (!isObj(cropProtection)) {
+		warnings.push(`${label}: cropProtection debería ser un objeto`);
+		return;
+	}
+	if (cropProtection.intervalTicks != null) {
+		if (!isFiniteNumber(cropProtection.intervalTicks) || Number(cropProtection.intervalTicks) < 1) {
+			warnings.push(`${label}: cropProtection.intervalTicks debería ser >= 1`);
+		}
+	}
+	if (cropProtection.snapshotTtlMs != null) {
+		if (!isFiniteNumber(cropProtection.snapshotTtlMs) || Number(cropProtection.snapshotTtlMs) < 100) {
+			warnings.push(`${label}: cropProtection.snapshotTtlMs debería ser >= 100`);
+		}
+	}
+	if (cropProtection.enabled != null && typeof cropProtection.enabled !== "boolean") {
+		warnings.push(`${label}: cropProtection.enabled debería ser boolean`);
+	}
+	if (cropProtection.restoreDestroyedCrop != null && typeof cropProtection.restoreDestroyedCrop !== "boolean") {
+		warnings.push(`${label}: cropProtection.restoreDestroyedCrop debería ser boolean`);
+	}
+	if (cropProtection.suppressVanillaDrops != null && typeof cropProtection.suppressVanillaDrops !== "boolean") {
+		warnings.push(`${label}: cropProtection.suppressVanillaDrops debería ser boolean`);
+	}
+	if (cropProtection.dropSuppressTtlMs != null) {
+		if (!isFiniteNumber(cropProtection.dropSuppressTtlMs) || Number(cropProtection.dropSuppressTtlMs) < 100) {
+			warnings.push(`${label}: cropProtection.dropSuppressTtlMs debería ser >= 100`);
+		}
+	}
+	if (cropProtection.dropSuppressRadius != null) {
+		if (!isFiniteNumber(cropProtection.dropSuppressRadius) || Number(cropProtection.dropSuppressRadius) <= 0) {
+			warnings.push(`${label}: cropProtection.dropSuppressRadius debería ser > 0`);
+		}
+	}
+	if (cropProtection.blockedVanillaItemIds != null && !isStringArray(cropProtection.blockedVanillaItemIds)) {
+		warnings.push(`${label}: cropProtection.blockedVanillaItemIds debería ser string[]`);
+	}
+	if (cropProtection.footTrailTtlMs != null) {
+		if (!isFiniteNumber(cropProtection.footTrailTtlMs) || Number(cropProtection.footTrailTtlMs) < 50) {
+			warnings.push(`${label}: cropProtection.footTrailTtlMs debería ser >= 50`);
+		}
+	}
+}
+
 /**
  * @param {any} config
  * @returns {{ warnings: string[], errors: string[] }}
@@ -181,6 +272,7 @@ export function validateSkillRegenConfig(config) {
 	const blocks = Array.isArray(config.blocks) ? config.blocks : [];
 	if (blocks.length === 0) warnings.push("Config: blocks está vacío (no hay bloques regenerables registrados)");
 	validateSpreadConfig(config?.runtime?.spread, "Config runtime", warnings);
+	validateCropProtectionConfig(config?.runtime?.cropProtection, "Config runtime", warnings);
 	let usesAreaFilters = false;
 	for (const [i, b] of blocks.entries()) {
 		if (!isObj(b)) {
@@ -243,6 +335,8 @@ export function validateSkillRegenConfig(config) {
 			validateScoreboardAddsObject(b.scoreboardAddsOnBreak, `Block[${i}] (${asStr(b.id) || "?"})`, warnings);
 		}
 		validateSpreadConfig(b.spread, `Block[${i}] (${asStr(b.id) || "?"})`, warnings);
+		validateMutationConfig(b.mutation, `Block[${i}] (${asStr(b.id) || "?"})`, warnings);
+		validateGrowthCycleConfig(b.growthCycle, `Block[${i}] (${asStr(b.id) || "?"})`, warnings);
 
 		// Métricas por-modifier
 		if (b.modifiers != null) {

@@ -143,6 +143,58 @@ function normalizeScoreboardAdds(value) {
 	return Object.keys(out).length ? out : null;
 }
 
+function normalizeBlockStates(value) {
+	if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+	const out = {};
+	for (const [k, v] of Object.entries(value)) {
+		const key = normalizeString(k);
+		if (!key) continue;
+		if (typeof v === "number") {
+			if (!Number.isFinite(v)) continue;
+			out[key] = Math.trunc(v);
+			continue;
+		}
+		if (typeof v === "string" || typeof v === "boolean") {
+			out[key] = v;
+			continue;
+		}
+	}
+	return Object.keys(out).length ? out : null;
+}
+
+function normalizeGrowthCycle(value) {
+	if (!value || typeof value !== "object") return undefined;
+	if (value.enabled === false) return undefined;
+	const state = normalizeString(value.state ?? value.stateName ?? "growth");
+	if (!state) return undefined;
+	const matureValue = toNumberOr(value.matureValue ?? value.harvestValue, NaN);
+	const seedValue = toNumberOr(value.seedValue ?? value.initialValue, NaN);
+	if (!Number.isFinite(matureValue) || !Number.isFinite(seedValue)) return undefined;
+	return {
+		state,
+		matureValue: Math.trunc(matureValue),
+		seedValue: Math.trunc(seedValue),
+		instantRestoreImmature: value.instantRestoreImmature !== false,
+	};
+}
+
+function normalizeMutation(value) {
+	if (!value || typeof value !== "object") return undefined;
+	if (value.enabled === false) return undefined;
+	const objective = normalizeString(value.objective);
+	const scoreMin = Math.max(0, Math.trunc(toNumberOr(value.scoreMin, 0)));
+	const scoreMax = Math.max(1, Math.trunc(toNumberOr(value.scoreMax ?? value.maxScore, 1000)));
+	const drops = Array.isArray(value.drops) ? value.drops : [];
+	if (!objective || drops.length === 0) return undefined;
+	return {
+		enabled: true,
+		objective,
+		scoreMin,
+		scoreMax,
+		drops,
+	};
+}
+
 function normalizeWhenTree(node) {
 	if (!node || typeof node !== "object") return undefined;
 	const out = {};
@@ -300,6 +352,8 @@ export function normalizeBlockDefinition(blockDef, config) {
 	const modifiers = normalizeModifiers(blockDef && blockDef.modifiers);
 	const fortuneTiers = normalizeFortuneTiers(blockDef && blockDef.fortuneTiers);
 	const spread = blockDef && blockDef.spread && typeof blockDef.spread === "object" ? blockDef.spread : undefined;
+	const mutation = normalizeMutation(blockDef && blockDef.mutation);
+	const growthCycle = normalizeGrowthCycle(blockDef && blockDef.growthCycle);
 
 	// XP y xpTitle block-level (independientes de fortuna)
 	const xp = blockDef && blockDef.xp && typeof blockDef.xp === "object" ? blockDef.xp : undefined;
@@ -325,6 +379,8 @@ export function normalizeBlockDefinition(blockDef, config) {
 		spread,
 		xp,
 		xpTitle,
+		mutation,
+		growthCycle,
 	};
 }
 

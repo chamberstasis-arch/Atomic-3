@@ -10,6 +10,8 @@
  *  type: StatType,
  *  // Si true, el scoreboard almacena valor * 10 (enteros).
  *  x10?: boolean,
+ *  // Escalado especial para stats puntuales.
+ *  scale?: "percent_to_1000",
  *  // Defaults por jugador (solo para capa Personal).
  *  defaultPersonal?: number,
  *  personal: string,
@@ -158,6 +160,7 @@ export const STAT_REGISTRY = [
 		id: "MutAct",
 		label: "Mutación Activa:",
 		type: "float",
+		scale: "percent_to_1000",
 		personal: "MutActPersonalH",
 		equipamiento: "MutActEquipamientoH",
 		otros: "MutActOtrosH",

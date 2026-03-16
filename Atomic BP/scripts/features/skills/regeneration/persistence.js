@@ -42,13 +42,36 @@ function normalizeEntry(e) {
 	if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
 	if (!Number.isFinite(restoreAt)) return null;
 
+	const normalizeStates = (value) => {
+		if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+		const out = {};
+		for (const [k, v] of Object.entries(value)) {
+			const key = String(k != null ? k : "").trim();
+			if (!key) continue;
+			if (typeof v === "number") {
+				if (!Number.isFinite(v)) continue;
+				out[key] = Math.trunc(v);
+				continue;
+			}
+			if (typeof v === "string" || typeof v === "boolean") {
+				out[key] = v;
+			}
+		}
+		return Object.keys(out).length ? out : undefined;
+	};
+
+	const blockStates = normalizeStates(e.blockStates);
+	const minedBlockStates = normalizeStates(e.minedBlockStates);
+
 	return {
 		dimensionId,
 		x: Math.floor(x),
 		y: Math.floor(y),
 		z: Math.floor(z),
 		blockId,
+		...(blockStates ? { blockStates } : {}),
 		minedBlockId,
+		...(minedBlockStates ? { minedBlockStates } : {}),
 		restoreAt,
 	};
 }

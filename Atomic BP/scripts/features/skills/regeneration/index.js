@@ -33,6 +33,12 @@ import {
 } from "./persistence.js";
 
 let didInit = false;
+/** @type {Map<string, { capturedAtMs: number, cropTarget: { id: string, states?: Record<string, any> } }>} */
+const cropTrampleSnapshotBySpot = new Map();
+/** @type {Map<string, { dimensionId: string, x: number, y: number, z: number, expiresAtMs: number, blockedItemIds: string[] }>} */
+const cropTrampleDropSuppressionBySpot = new Map();
+/** @type {Map<string, { dimensionId: string, pos: { x: number, y: number, z: number }, updatedAtMs: number }>} */
+const cropProtectionLastFootByPlayer = new Map();
 
 function nowMs() {
 	return Date.now();
@@ -354,6 +360,502 @@ function resolveXpGain(xpRule, player) {
 	return { gain, stat, multiplier };
 }
 
+function resolveMutationDrops(blockDef, player) {
+	const mutation = blockDef?.mutation && typeof blockDef.mutation === "object" ? blockDef.mutation : null;
+	if (!mutation || mutation.enabled === false) return null;
+	const drops = Array.isArray(mutation.drops) ? mutation.drops : [];
+	if (drops.length === 0) return null;
+
+	const objective = String(mutation.objective ?? "").trim();
+	const scoreMaxRaw = Number(mutation.scoreMax ?? mutation.maxScore ?? 1000);
+	const scoreMax = Number.isFinite(scoreMaxRaw) ? Math.max(1, Math.trunc(scoreMaxRaw)) : 1000;
+	const scoreMinRaw = Number(mutation.scoreMin ?? 0);
+	const scoreMin = Number.isFinite(scoreMinRaw) ? Math.max(0, Math.trunc(scoreMinRaw)) : 0;
+
+	const score = objective ? (getScoreBestEffort(player, objective) ?? 0) : scoreMax;
+	const clampedScore = Math.max(scoreMin, Math.min(scoreMax, Math.trunc(Number(score) || 0)));
+	const chance = Math.max(0, Math.min(1, clampedScore / scoreMax));
+	if (chance <= 0) return null;
+	if (chance < 1 && Math.random() >= chance) return null;
+
+	return drops;
+}
+
+function normalizeBlockStatesForRuntime(value) {
+	if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+	const out = {};
+	for (const [k, v] of Object.entries(value)) {
+		const key = String(k != null ? k : "").trim();
+		if (!key) continue;
+		if (typeof v === "number") {
+			if (!Number.isFinite(v)) continue;
+			out[key] = Math.trunc(v);
+			continue;
+		}
+		if (typeof v === "string" || typeof v === "boolean") out[key] = v;
+	}
+	return Object.keys(out).length ? out : null;
+}
+
+function resolveBlockTarget(target, fallbackId = "") {
+	if (typeof target === "string") {
+		const id = String(target).trim();
+		return id ? { id, states: null } : null;
+	}
+	if (!target || typeof target !== "object") return null;
+	const id = String(target.id ?? fallbackId ?? "").trim();
+	if (!id) return null;
+	return {
+		id,
+		states: normalizeBlockStatesForRuntime(target.states),
+	};
+}
+
+function getEventBrokenStateValueSafe(ev, stateName) {
+	try {
+		const state = String(stateName ?? "").trim();
+		if (!state) return null;
+		const perm = ev?.brokenBlockPermutation;
+		if (!perm || typeof perm.getState !== "function") return null;
+		return perm.getState(state);
+	} catch (e) {
+		void e;
+		return null;
+	}
+}
+
+function getBlockStateValueSafe(dimension, pos, stateName) {
+	try {
+		const state = String(stateName ?? "").trim();
+		if (!state) return null;
+		const block = dimension.getBlock(pos);
+		if (!block?.permutation || typeof block.permutation.getState !== "function") return null;
+		return block.permutation.getState(state);
+	} catch (e) {
+		void e;
+		return null;
+	}
+}
+
+function isStateValueAtLeast(value, min) {
+	const current = Number(value);
+	const required = Number(min);
+	if (!Number.isFinite(current) || !Number.isFinite(required)) return false;
+	return current >= required;
+}
+
+function isFarmlandType(typeId) {
+	const t = String(typeId ?? "").trim().toLowerCase();
+	return t === "minecraft:farmland" || t === "minecraft:wet_farmland";
+}
+
+function isAirType(typeId) {
+	const t = String(typeId ?? "").trim().toLowerCase();
+	return t === "minecraft:air" || t === "minecraft:cave_air" || t === "minecraft:void_air";
+}
+
+function isLikelyFarmlandTrampleResult(typeId) {
+	const t = String(typeId ?? "").trim().toLowerCase();
+	return t === "minecraft:dirt" || t === "minecraft:coarse_dirt" || t === "minecraft:rooted_dirt";
+}
+
+function normalizeBlockPosFromLocation(loc) {
+	if (!loc) return null;
+	const x = Number(loc.x);
+	const y = Number(loc.y);
+	const z = Number(loc.z);
+	if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
+	return { x: Math.floor(x), y: Math.floor(y), z: Math.floor(z) };
+}
+
+function makePlayerRuntimeKey(player) {
+	const pid = String(player?.id ?? "").trim();
+	if (pid) return pid;
+	const name = String(player?.nameTag ?? player?.name ?? "").trim();
+	if (name) return `name:${name}`;
+	return "";
+}
+
+function isSameBlockPos(a, b) {
+	if (!a || !b) return false;
+	return a.x === b.x && a.y === b.y && a.z === b.z;
+}
+
+function buildFootTrailCandidates(currentPos, previousPos) {
+	const out = [];
+	if (currentPos) out.push(currentPos);
+	if (previousPos && !isSameBlockPos(currentPos, previousPos)) {
+		out.push(previousPos);
+		const dx = Math.abs(Number(currentPos?.x) - Number(previousPos.x));
+		const dz = Math.abs(Number(currentPos?.z) - Number(previousPos.z));
+		if (Number.isFinite(dx) && Number.isFinite(dz) && (dx > 1 || dz > 1) && dx <= 3 && dz <= 3) {
+			out.push({
+				x: Math.round((currentPos.x + previousPos.x) / 2),
+				y: currentPos.y,
+				z: Math.round((currentPos.z + previousPos.z) / 2),
+			});
+		}
+	}
+	return out;
+}
+
+function getFarmlandPosUnderPlayer(player) {
+	const pos = normalizeBlockPosFromLocation(player?.location);
+	if (!pos) return null;
+	return { x: pos.x, y: pos.y - 1, z: pos.z };
+}
+
+function recordCropSnapshotAtSpot(dimension, dimensionId, farmlandPos, cropTypeId) {
+	if (!dimension || !farmlandPos || !cropTypeId) return;
+	const spotKey = makeKeyFromPos(dimensionId, farmlandPos);
+	const cropPos = { x: farmlandPos.x, y: farmlandPos.y + 1, z: farmlandPos.z };
+	cropTrampleSnapshotBySpot.set(spotKey, {
+		capturedAtMs: nowMs(),
+		cropTarget: {
+			id: String(cropTypeId),
+			states: getBlockStatesSnapshotSafe(dimension, cropPos),
+		},
+	});
+}
+
+function getBlockStatesSnapshotSafe(dimension, pos) {
+	try {
+		const block = dimension.getBlock(pos);
+		const perm = block?.permutation;
+		if (!perm || typeof perm.getAllStates !== "function") return undefined;
+		return normalizeBlockStatesForRuntime(perm.getAllStates());
+	} catch (e) {
+		void e;
+		return undefined;
+	}
+}
+
+function getCropProtectionConfig(config) {
+	const raw = config?.runtime?.cropProtection;
+	const enabled = raw?.enabled !== false;
+	const intervalTicks = Math.max(1, Math.trunc(Number(raw?.intervalTicks ?? 1) || 1));
+	const restoreDestroyedCrop = raw?.restoreDestroyedCrop !== false;
+	const snapshotTtlMs = Math.max(100, Math.trunc(Number(raw?.snapshotTtlMs ?? 1200) || 1200));
+	const suppressVanillaDrops = raw?.suppressVanillaDrops !== false;
+	const dropSuppressTtlMs = Math.max(100, Math.trunc(Number(raw?.dropSuppressTtlMs ?? 500) || 500));
+	const dropSuppressRadius = Math.max(0.5, Number(raw?.dropSuppressRadius ?? 1.2) || 1.2);
+	const blockedVanillaItemIds = Array.isArray(raw?.blockedVanillaItemIds)
+		? raw.blockedVanillaItemIds.map((v) => String(v ?? "").trim()).filter(Boolean)
+		: [];
+	const footTrailTtlMs = Math.max(50, Math.trunc(Number(raw?.footTrailTtlMs ?? 350) || 350));
+	return {
+		enabled,
+		intervalTicks,
+		restoreDestroyedCrop,
+		snapshotTtlMs,
+		suppressVanillaDrops,
+		dropSuppressTtlMs,
+		dropSuppressRadius,
+		blockedVanillaItemIds,
+		footTrailTtlMs,
+	};
+}
+
+function inferVanillaTrampleDropItemIds(cropBlockId) {
+	const id = String(cropBlockId ?? "").trim().toLowerCase();
+	if (!id) return [];
+	if (id === "minecraft:carrots") return ["minecraft:carrot"];
+	if (id === "minecraft:potatoes") return ["minecraft:potato"];
+	if (id === "minecraft:wheat") return ["minecraft:wheat", "minecraft:wheat_seeds"];
+	if (id === "minecraft:beetroot") return ["minecraft:beetroot", "minecraft:beetroot_seeds"];
+	if (id === "minecraft:nether_wart") return ["minecraft:nether_wart"];
+	return [];
+}
+
+function mergeUniqueLowercase(values) {
+	const out = [];
+	const seen = new Set();
+	for (const v of values) {
+		const key = String(v ?? "").trim().toLowerCase();
+		if (!key || seen.has(key)) continue;
+		seen.add(key);
+		out.push(key);
+	}
+	return out;
+}
+
+function markTrampleDropSuppression(context) {
+	const {
+		dimensionId,
+		farmlandPos,
+		cropBlockId,
+		cropProtection,
+	} = context;
+	if (!cropProtection?.suppressVanillaDrops) return;
+	const blockedItemIds = mergeUniqueLowercase([
+		...inferVanillaTrampleDropItemIds(cropBlockId),
+		...(Array.isArray(cropProtection.blockedVanillaItemIds) ? cropProtection.blockedVanillaItemIds : []),
+	]);
+	if (blockedItemIds.length === 0) return;
+	const spotKey = makeKeyFromPos(dimensionId, farmlandPos);
+	cropTrampleDropSuppressionBySpot.set(spotKey, {
+		dimensionId,
+		x: farmlandPos.x,
+		y: farmlandPos.y + 1,
+		z: farmlandPos.z,
+		expiresAtMs: nowMs() + cropProtection.dropSuppressTtlMs,
+		blockedItemIds,
+	});
+}
+
+function cleanupExpiredCropProtectionState(cropProtection) {
+	const now = nowMs();
+	for (const [k, v] of cropTrampleSnapshotBySpot.entries()) {
+		if (!v || now - Number(v.capturedAtMs) > cropProtection.snapshotTtlMs) {
+			cropTrampleSnapshotBySpot.delete(k);
+		}
+	}
+	for (const [k, v] of cropTrampleDropSuppressionBySpot.entries()) {
+		if (!v || now > Number(v.expiresAtMs)) {
+			cropTrampleDropSuppressionBySpot.delete(k);
+		}
+	}
+}
+
+function getItemEntityStackTypeIdSafe(entity) {
+	try {
+		if (!entity || String(entity.typeId) !== "minecraft:item") return "";
+		const itemComp = entity.getComponent("minecraft:item");
+		const typeId = itemComp?.itemStack?.typeId;
+		return String(typeId ?? "").trim().toLowerCase();
+	} catch (e) {
+		void e;
+		return "";
+	}
+}
+
+function trySuppressVanillaTrampleDrop(config, entity) {
+	if (!entity || String(entity.typeId) !== "minecraft:item") return false;
+	if (cropTrampleDropSuppressionBySpot.size === 0) return false;
+
+	const cropProtection = getCropProtectionConfig(config);
+	if (!cropProtection.enabled || !cropProtection.suppressVanillaDrops) return false;
+
+	const itemId = getItemEntityStackTypeIdSafe(entity);
+	if (!itemId) return false;
+
+	const pos = normalizeBlockPosFromLocation(entity.location);
+	const dimId = String(entity.dimension?.id ?? "");
+	if (!pos || !dimId) return false;
+
+	const radiusSq = cropProtection.dropSuppressRadius * cropProtection.dropSuppressRadius;
+	const now = nowMs();
+
+	for (const [k, entry] of cropTrampleDropSuppressionBySpot.entries()) {
+		if (!entry || now > Number(entry.expiresAtMs)) {
+			cropTrampleDropSuppressionBySpot.delete(k);
+			continue;
+		}
+		if (entry.dimensionId !== dimId) continue;
+		if (!Array.isArray(entry.blockedItemIds) || !entry.blockedItemIds.includes(itemId)) continue;
+		const dx = pos.x - entry.x;
+		const dy = pos.y - entry.y;
+		const dz = pos.z - entry.z;
+		const distSq = dx * dx + dy * dy + dz * dz;
+		if (distSq > radiusSq) continue;
+		try {
+			entity.remove();
+			if (debugEnabled(config)) dbg(config, `cropProtection: suppressed vanilla drop ${itemId}`);
+			return true;
+		} catch (e) {
+			void e;
+		}
+	}
+
+	return false;
+}
+
+function hasManagedGrowthCycleDefinitions(registry) {
+	if (!registry || typeof registry !== "object") return false;
+	const exact = registry.exact instanceof Map ? registry.exact : null;
+	if (exact) {
+		for (const def of exact.values()) {
+			if (def?.growthCycle) return true;
+		}
+	}
+	const patterns = Array.isArray(registry.patterns) ? registry.patterns : [];
+	for (const def of patterns) {
+		if (def?.growthCycle) return true;
+	}
+	return false;
+}
+
+function tryProtectFarmlandSpot(context) {
+	const {
+		config,
+		registry,
+		dimension,
+		dimensionId,
+		farmlandPos,
+		areas,
+		cropProtection,
+	} = context;
+	const now = nowMs();
+	const spotKey = makeKeyFromPos(dimensionId, farmlandPos);
+
+	const supportType = getBlockTypeIdSafe(dimension, farmlandPos);
+	if (!supportType) return false;
+
+	const abovePos = { x: farmlandPos.x, y: farmlandPos.y + 1, z: farmlandPos.z };
+	const aboveType = getBlockTypeIdSafe(dimension, abovePos);
+
+	if (aboveType) {
+		const managedDef = getBlockDefinition(registry, aboveType);
+		if (managedDef?.growthCycle && isInAnyArea(dimensionId, abovePos, areas, managedDef.areaIds)) {
+			recordCropSnapshotAtSpot(dimension, dimensionId, farmlandPos, aboveType);
+
+			if (!isFarmlandType(supportType) && isLikelyFarmlandTrampleResult(supportType)) {
+				const restored = setBlockTypeSafe(dimension, farmlandPos, "minecraft:farmland");
+				if (restored) {
+					markTrampleDropSuppression({
+						dimensionId,
+						farmlandPos,
+						cropBlockId: aboveType,
+						cropProtection,
+					});
+				}
+				if (restored && debugEnabled(config)) {
+					dbg(config, `cropProtection: restored farmland at ${farmlandPos.x},${farmlandPos.y},${farmlandPos.z}`);
+				}
+				return restored;
+			}
+			return false;
+		}
+	}
+
+	if (!isAirType(aboveType) || isFarmlandType(supportType) || !isLikelyFarmlandTrampleResult(supportType)) {
+		return false;
+	}
+
+	const snapshot = cropTrampleSnapshotBySpot.get(spotKey);
+	if (!snapshot) return false;
+	if (now - snapshot.capturedAtMs > cropProtection.snapshotTtlMs) {
+		cropTrampleSnapshotBySpot.delete(spotKey);
+		return false;
+	}
+
+	const supportRestored = setBlockTypeSafe(dimension, farmlandPos, "minecraft:farmland");
+	if (!supportRestored) return false;
+
+	if (cropProtection.restoreDestroyedCrop) {
+		setBlockTypeSafe(dimension, abovePos, snapshot.cropTarget);
+	}
+
+	markTrampleDropSuppression({
+		dimensionId,
+		farmlandPos,
+		cropBlockId: snapshot.cropTarget?.id,
+		cropProtection,
+	});
+
+	cropTrampleSnapshotBySpot.delete(spotKey);
+	if (debugEnabled(config)) dbg(config, `cropProtection: recovered trample at ${farmlandPos.x},${farmlandPos.y},${farmlandPos.z}`);
+	return true;
+}
+
+function runCropProtectionTick(config, registry) {
+	const cropProtection = getCropProtectionConfig(config);
+	if (!cropProtection.enabled) return;
+	const areas = Array.isArray(config?.areas) ? config.areas : [];
+	cleanupExpiredCropProtectionState(cropProtection);
+	const now = nowMs();
+	if (cropProtectionLastFootByPlayer.size > 256) {
+		for (const [k, v] of cropProtectionLastFootByPlayer.entries()) {
+			if (!v || now - Number(v.updatedAtMs) > cropProtection.footTrailTtlMs * 2) {
+				cropProtectionLastFootByPlayer.delete(k);
+			}
+		}
+	}
+
+	for (const player of world.getPlayers()) {
+		try {
+			if (!player) continue;
+			const dim = player.dimension;
+			if (!dim) continue;
+			const dimensionId = String(dim.id ?? "");
+			const playerKey = makePlayerRuntimeKey(player);
+			const currentFarmlandPos = getFarmlandPosUnderPlayer(player);
+			if (!currentFarmlandPos) continue;
+
+			const previousFoot = playerKey ? cropProtectionLastFootByPlayer.get(playerKey) : null;
+			const previousFarmlandPos = previousFoot && previousFoot.dimensionId === dimensionId && now - Number(previousFoot.updatedAtMs) <= cropProtection.footTrailTtlMs
+				? previousFoot.pos
+				: null;
+
+			const candidates = buildFootTrailCandidates(currentFarmlandPos, previousFarmlandPos);
+			const seen = new Set();
+			for (const farmlandPos of candidates) {
+				if (!farmlandPos) continue;
+				const key = `${farmlandPos.x}:${farmlandPos.y}:${farmlandPos.z}`;
+				if (seen.has(key)) continue;
+				seen.add(key);
+				tryProtectFarmlandSpot({
+					config,
+					registry,
+					dimension: dim,
+					dimensionId,
+					farmlandPos,
+					areas,
+					cropProtection,
+				});
+			}
+
+			if (playerKey) {
+				cropProtectionLastFootByPlayer.set(playerKey, {
+					dimensionId,
+					pos: currentFarmlandPos,
+					updatedAtMs: now,
+				});
+			}
+		} catch (e) {
+			void e;
+		}
+	}
+}
+
+function getGrowthCycleTargets(blockDef, originalBlockTypeId) {
+	const cycle = blockDef?.growthCycle;
+	if (!cycle || typeof cycle !== "object") return null;
+	const typeId = String(blockDef?.blockId || originalBlockTypeId || "").trim();
+	if (!typeId) return null;
+	const stateName = String(cycle.state ?? "growth").trim();
+	const matureValue = Math.trunc(Number(cycle.matureValue));
+	const seedValue = Math.trunc(Number(cycle.seedValue));
+	if (!stateName || !Number.isFinite(matureValue) || !Number.isFinite(seedValue)) return null;
+	return {
+		stateName,
+		matureValue,
+		seedValue,
+		instantRestoreImmature: cycle.instantRestoreImmature !== false,
+		minedTarget: { id: typeId, states: { [stateName]: seedValue } },
+		restoreTarget: { id: typeId, states: { [stateName]: matureValue } },
+	};
+}
+
+function isBlockTargetMatch(dimension, pos, target) {
+	try {
+		const resolved = resolveBlockTarget(target);
+		if (!resolved) return false;
+		const block = dimension.getBlock(pos);
+		if (!block) return false;
+		if (String(block.typeId) !== resolved.id) return false;
+		if (!resolved.states) return true;
+		if (!block.permutation || typeof block.permutation.getState !== "function") return false;
+		for (const [key, expected] of Object.entries(resolved.states)) {
+			if (block.permutation.getState(key) !== expected) return false;
+		}
+		return true;
+	} catch (e) {
+		void e;
+		return false;
+	}
+}
+
 function renderTitleContent(templateLines, payload) {
 	const lines = Array.isArray(templateLines) ? templateLines : [String(templateLines ?? "")];
 	return lines.map((line) => {
@@ -401,9 +903,28 @@ function tell(player, msg) {
 	}
 }
 
-function isTraceTargetBlock(blockTypeId) {
-	const t = String(blockTypeId != null ? blockTypeId : "");
-	return t === "minecraft:coal_ore" || t === "minecraft:deepslate_coal_ore";
+function getDebugTag(config) {
+	const tag = String(config?.debug?.tag ?? "regen").trim();
+	return tag || "regen";
+}
+
+function toTraceFilterTokenList(raw) {
+	if (!Array.isArray(raw)) return [];
+	return raw.map((v) => String(v ?? "").trim().toLowerCase()).filter(Boolean);
+}
+
+function isTraceTargetBlock(config, blockTypeId, blockDef) {
+	const targets = toTraceFilterTokenList(config?.debug?.traceTargets);
+	if (targets.length === 0) return true;
+	const typeId = String(blockTypeId ?? "").trim().toLowerCase();
+	const defId = String(blockDef?.id ?? "").trim().toLowerCase();
+	const skillId = String(blockDef?.skill ?? "").trim().toLowerCase();
+	for (const target of targets) {
+		if (target === "*" || target === typeId) return true;
+		if (target.startsWith("skill:") && target.slice(6) === skillId) return true;
+		if (target.startsWith("def:") && target.slice(4) === defId) return true;
+	}
+	return false;
 }
 
 function isSafeCommandToken(token) {
@@ -471,7 +992,7 @@ function playMineSoundBestEffort(config, player, dimension, pos, oreDef, traceTo
 			}
 
 			if (traceToPlayer && debugTellPlayer(config) && player) {
-				tell(player, `§8[mining] sounds=${played}/${sounds.length} via=${via}`);
+				tell(player, `§8[${getDebugTag(config)}] sounds=${played}/${sounds.length} via=${via}`);
 			}
 			if (debugEnabled(config) && played === 0) dbg(config, "sound: no se pudo reproducir ningún sonido");
 		});
@@ -561,21 +1082,23 @@ function safeGetDimension(id) {
 	}
 }
 
-function setBlockTypeSafe(dimension, pos, blockTypeId) {
+function setBlockTypeSafe(dimension, pos, blockTypeIdOrTarget) {
 	try {
+		const target = resolveBlockTarget(blockTypeIdOrTarget);
+		if (!target) return false;
 		const block = dimension.getBlock(pos);
 		if (!block) return false;
 
 		// Preferir permutation (más estable en varias versiones)
 		if (mc?.BlockPermutation?.resolve && typeof block.setPermutation === "function") {
-			const perm = mc.BlockPermutation.resolve(String(blockTypeId));
+			const perm = mc.BlockPermutation.resolve(target.id, target.states || undefined);
 			block.setPermutation(perm);
 			return true;
 		}
 
 		// Fallback
 		if (typeof block.setType === "function") {
-			block.setType(String(blockTypeId));
+			block.setType(target.id);
 			return true;
 		}
 	} catch (e) {
@@ -710,14 +1233,17 @@ export function initMiningRegen(userConfig) {
 				}
 
 				const pos = { x: entry.x, y: entry.y, z: entry.z };
-				const current = getBlockTypeIdSafe(dim, pos);
-				if (current !== entry.minedBlockId) {
+				const currentMatchesMined = isBlockTargetMatch(dim, pos, {
+					id: entry.minedBlockId,
+					states: entry.minedBlockStates,
+				});
+				if (!currentMatchesMined) {
 					// Se cambió externamente: no restaurar.
 					removePendingByKey(key);
 					return;
 				}
 
-				setBlockTypeSafe(dim, pos, entry.blockId);
+				setBlockTypeSafe(dim, pos, { id: entry.blockId, states: entry.blockStates });
 				removePendingByKey(key);
 			} catch (e) {
 				void e;
@@ -747,32 +1273,48 @@ export function initMiningRegen(userConfig) {
 		try {
 			if (!config || !config.enabled) return false;
 			if (isCreativeBestEffort(player)) return false;
+			const debugTag = getDebugTag(config);
+			const growthTargets = getGrowthCycleTargets(blockDef, originalBlockTypeId);
+			const minedTarget = growthTargets?.minedTarget ?? blockDef.minedBlockId;
+			const restoreTarget = growthTargets?.restoreTarget ?? originalBlockTypeId;
+			const resolvedMinedTarget = resolveBlockTarget(minedTarget);
+			const resolvedRestoreTarget = resolveBlockTarget(restoreTarget);
+			if (growthTargets) {
+				const stateValue = getBlockStateValueSafe(dim, blockPos, growthTargets.stateName);
+				const isHarvestReady = isStateValueAtLeast(stateValue, growthTargets.matureValue);
+				if (!isHarvestReady) {
+					if (growthTargets.instantRestoreImmature) {
+						setBlockTypeSafe(dim, blockPos, growthTargets.minedTarget);
+					}
+					return false;
+				}
+			}
 
 			const current = getBlockTypeIdSafe(dim, blockPos);
 			if (minedStatePreApplied) {
-				if (current !== blockDef.minedBlockId) {
+				if (!isBlockTargetMatch(dim, blockPos, minedTarget)) {
 					const recovered = current === originalBlockTypeId
-						? setBlockTypeSafe(dim, blockPos, blockDef.minedBlockId)
+						? setBlockTypeSafe(dim, blockPos, minedTarget)
 						: false;
 					if (!recovered) {
-						if (isTargetTrace) tell(player, `§c[mining] abort: bloque cambió (${current})`);
+						if (isTargetTrace) tell(player, `§c[${debugTag}] abort: bloque cambió (${current})`);
 						return false;
 					}
 				}
 			} else {
 				if (current !== originalBlockTypeId) {
-					if (isTargetTrace) tell(player, `§c[mining] abort: bloque cambió (${current})`);
+					if (isTargetTrace) tell(player, `§c[${debugTag}] abort: bloque cambió (${current})`);
 					return false;
 				}
 
-				const didSetMinedState = setBlockTypeSafe(dim, blockPos, blockDef.minedBlockId);
+				const didSetMinedState = setBlockTypeSafe(dim, blockPos, minedTarget);
 				if (!didSetMinedState) {
-					dbg(config, `No se pudo setear minedState=${blockDef.minedBlockId} en ${key}`);
-					if (isTargetTrace) tell(player, "§c[mining] mined-state FAIL (no se puede aplicar)");
+					dbg(config, `No se pudo setear minedState en ${key}`);
+					if (isTargetTrace) tell(player, `§c[${debugTag}] mined-state FAIL (no se puede aplicar)`);
 					return false;
 				}
 			}
-			if (isTargetTrace) tell(player, "§a[mining] mined-state=ok");
+			if (isTargetTrace) tell(player, `§a[${debugTag}] mined-state=ok`);
 
 			let selected = selectedOverride;
 			if (!selected) {
@@ -790,6 +1332,10 @@ export function initMiningRegen(userConfig) {
 			}
 
 			const dropsTable = resolveDropsTable(blockDef, selected);
+			const mutationDrops = resolveMutationDrops(blockDef, player);
+			const finalDropsTable = Array.isArray(mutationDrops) && mutationDrops.length > 0
+				? [...dropsTable, ...mutationDrops]
+				: dropsTable;
 
 			try {
 				const triggerKeys = getParticleTriggerModifierKeys(config);
@@ -804,9 +1350,9 @@ export function initMiningRegen(userConfig) {
 				void e;
 			}
 
-			const spawned = runDropsTable(dim, blockPos, dropsTable);
+			const spawned = runDropsTable(dim, blockPos, finalDropsTable);
 			spawnXpOrbsBestEffort(config, dim, blockPos, blockDef);
-			if (debugTellPlayer(config)) tell(player, `§7[mining] drops=${spawned} skill=${blockDef.skill} regen=${blockDef.regenSeconds}s`);
+			if (debugTellPlayer(config)) tell(player, `§7[${debugTag}] drops=${spawned} skill=${blockDef.skill} regen=${blockDef.regenSeconds}s`);
 
 			const globalAdds = metricsEnabled(config) ? getScoreboardAddsOnBreak(config) : null;
 			const blockAdds = blockDef && blockDef.scoreboardAddsOnBreak && typeof blockDef.scoreboardAddsOnBreak === "object" ? blockDef.scoreboardAddsOnBreak : null;
@@ -834,8 +1380,10 @@ export function initMiningRegen(userConfig) {
 				x: blockPos.x,
 				y: blockPos.y,
 				z: blockPos.z,
-				blockId: originalBlockTypeId,
-				minedBlockId: blockDef.minedBlockId,
+				blockId: resolvedRestoreTarget?.id ?? originalBlockTypeId,
+				blockStates: resolvedRestoreTarget?.states ?? undefined,
+				minedBlockId: resolvedMinedTarget?.id ?? blockDef.minedBlockId,
+				minedBlockStates: resolvedMinedTarget?.states ?? undefined,
 				restoreAt: nowMs() + blockDef.regenSeconds * 1000,
 			});
 
@@ -912,14 +1460,17 @@ export function initMiningRegen(userConfig) {
 					}
 
 					const pos = { x: entry.x, y: entry.y, z: entry.z };
-					const current = getBlockTypeIdSafe(dim, pos);
-					if (current !== entry.minedBlockId) {
+					const currentMatchesMined = isBlockTargetMatch(dim, pos, {
+						id: entry.minedBlockId,
+						states: entry.minedBlockStates,
+					});
+					if (!currentMatchesMined) {
 						removePendingByKey(key);
 						return;
 					}
 
 					// Restaurar SIEMPRE al iniciar (sin importar restoreAt)
-					setBlockTypeSafe(dim, pos, entry.blockId);
+					setBlockTypeSafe(dim, pos, { id: entry.blockId, states: entry.blockStates });
 					removePendingByKey(key);
 				},
 				() => {
@@ -945,6 +1496,31 @@ export function initMiningRegen(userConfig) {
 		void e;
 	}
 
+	// Anti-grief de cultivos: restaura soporte de farmland en spots gestionados
+	// con costo acotado (solo revisa columna bajo cada jugador).
+	const cropProtection = getCropProtectionConfig(config);
+	if (cropProtection.enabled && hasManagedGrowthCycleDefinitions(registry)) {
+		try {
+			world?.afterEvents?.entitySpawn?.subscribe?.((ev) => {
+				try {
+					trySuppressVanillaTrampleDrop(config, ev?.entity);
+				} catch (e) {
+					void e;
+				}
+			});
+		} catch (e) {
+			void e;
+		}
+
+		system.runInterval(() => {
+			try {
+				runCropProtectionTick(config, registry);
+			} catch (e) {
+				void e;
+			}
+		}, cropProtection.intervalTicks);
+	}
+
 	// Evento principal: intercepta minado
 	world.beforeEvents.playerBreakBlock.subscribe((ev) => {
 		try {
@@ -956,11 +1532,13 @@ export function initMiningRegen(userConfig) {
 			const player = ev.player;
 			const dim = ev.dimension;
 			if (!dim) return;
+			const debugTag = getDebugTag(config);
+			const traceEnabled = debugTellPlayer(config) && debugTraceBreak(config);
 
 			// Traza gamemode (solo si está en modo trace)
-			if (debugTellPlayer(config) && debugTraceBreak(config)) {
+			if (traceEnabled) {
 				const gmName = getGameModeNameBestEffort(player);
-				if (gmName) tell(player, `§8[mining] gm=${gmName}`);
+				if (gmName) tell(player, `§8[${debugTag}] gm=${gmName}`);
 			}
 
 			// Bypass Creative
@@ -971,47 +1549,77 @@ export function initMiningRegen(userConfig) {
 			const dimensionId = String(dim.id != null ? dim.id : "");
 
 			// Traza de prueba: confirmar que el evento corre y qué datos entrega.
-			if (debugTellPlayer(config) && debugTraceBreak(config)) {
-				tell(player, `§8[mining] dim=${dimensionId} block=${block.typeId} @ ${blockPos.x},${blockPos.y},${blockPos.z}`);
+			if (traceEnabled) {
+				tell(player, `§8[${debugTag}] dim=${dimensionId} block=${block.typeId} @ ${blockPos.x},${blockPos.y},${blockPos.z}`);
 			}
 
-			const isTargetTrace = debugTellPlayer(config) && debugTraceBreak(config) && isTraceTargetBlock(block.typeId);
-			if (isTargetTrace) {
+			if (traceEnabled) {
 				const areasCount = Array.isArray(config.areas) ? config.areas.length : 0;
 				const blocksCount = Array.isArray(config.blocks)
 					? config.blocks.length
 					: 0;
-				tell(player, `§8[mining] cfg areas=${areasCount} blocks=${blocksCount}`);
+				tell(player, `§8[${debugTag}] cfg areas=${areasCount} blocks=${blocksCount}`);
 			}
 
 			const blockDef = getBlockDefinition(registry, block.typeId);
+			const isTargetTrace = traceEnabled && isTraceTargetBlock(config, block.typeId, blockDef);
 			if (!blockDef) {
-				if (isTargetTrace) tell(player, "§c[mining] ore NO registrado en config");
+				if (isTargetTrace) tell(player, `§c[${debugTag}] bloque NO registrado en config`);
 				return;
 			}
 
 			// Validación de área (soporta áreas dinámicas por bloque)
 			const inArea = isInAnyArea(dimensionId, blockPos, config.areas, blockDef.areaIds);
 			if (!inArea) {
-				if (isTargetTrace) tell(player, "§c[mining] fuera de area (no aplica)");
+				if (isTargetTrace) tell(player, `§c[${debugTag}] fuera de area (no aplica)`);
 				return;
 			}
-			if (isTargetTrace) tell(player, "§a[mining] area=ok");
-			if (isTargetTrace) tell(player, `§a[mining] block=ok skill=${blockDef.skill} regen=${blockDef.regenSeconds}s mined=${blockDef.minedBlockId}`);
+			if (isTargetTrace) tell(player, `§a[${debugTag}] area=ok`);
+			if (isTargetTrace) tell(player, `§a[${debugTag}] block=ok skill=${blockDef.skill} regen=${blockDef.regenSeconds}s mined=${blockDef.minedBlockId}`);
+
+			// Sembrar snapshot anti-trample desde el evento de break para cubrir sprint/break rápido
+			// sin depender de que el jugador siga parado exactamente encima del cultivo.
+			if (blockDef.growthCycle) {
+				const farmlandPos = { x: blockPos.x, y: blockPos.y - 1, z: blockPos.z };
+				recordCropSnapshotAtSpot(dim, dimensionId, farmlandPos, block.typeId);
+			}
+
+			// Cancelar lo antes posible para minimizar artefactos visuales del break vanilla
+			// en bloques gestionados por regeneration.
+			ev.cancel = true;
 
 			const key = makeKeyFromPos(dimensionId, blockPos);
 			const originalBlockTypeId = String(block.typeId != null ? block.typeId : "");
 
-			// Si ya está pendiente, cancelamos el break para evitar drops vanilla y duplicación.
+			// Si ya está pendiente, cancelamos el break para evitar drops vanilla, duplicación
+			// y cualquier sobrescritura visual de estados temporales del cultivo.
 			if (pendingByKey.has(key) || processingKeys.has(key)) {
-				if (isTargetTrace) tell(player, "§e[mining] ya pendiente => cancel");
-				ev.cancel = true;
+				if (isTargetTrace) tell(player, `§e[${debugTag}] ya pendiente => cancel`);
 				return;
 			}
 
+			const growthTargets = getGrowthCycleTargets(blockDef, originalBlockTypeId);
+			if (growthTargets) {
+				const stateValueFromEvent = getEventBrokenStateValueSafe(ev, growthTargets.stateName);
+				const stateValue = stateValueFromEvent != null
+					? stateValueFromEvent
+					: getBlockStateValueSafe(dim, blockPos, growthTargets.stateName);
+				const isHarvestReady = isStateValueAtLeast(stateValue, growthTargets.matureValue);
+				if (!isHarvestReady) {
+					if (growthTargets.instantRestoreImmature) {
+						const appliedNow = setBlockTypeSafe(dim, blockPos, growthTargets.minedTarget);
+						if (!appliedNow) {
+							system.run(() => {
+								setBlockTypeSafe(dim, blockPos, growthTargets.minedTarget);
+							});
+						}
+					}
+					return;
+				}
+			}
+
 			// Cancelar el break vanilla (evita drops vanilla)
-			ev.cancel = true;
-			if (isTargetTrace) tell(player, "§a[mining] cancel=true (procesando next tick)");
+			if (isTargetTrace) tell(player, `§a[${debugTag}] cancel=true (procesando next tick)`);
 
 			// Importante (2.4.0 stable): en early_execution, cambiar bloques puede fallar.
 			// Por eso, hacemos el procesamiento en el siguiente tick.
@@ -1024,8 +1632,9 @@ export function initMiningRegen(userConfig) {
 
 			// Mitigación visual/física: intentamos reemplazar el bloque en este mismo before-event.
 			// Si la API/versión no lo permite, el procesamiento diferido mantiene el fallback actual.
-			const minedStatePreApplied = setBlockTypeSafe(dim, blockPos, blockDef.minedBlockId);
-			if (isTargetTrace && minedStatePreApplied) tell(player, "§a[mining] mined-state preapply=ok");
+			const minedTargetPre = growthTargets?.minedTarget ?? blockDef.minedBlockId;
+			const minedStatePreApplied = setBlockTypeSafe(dim, blockPos, minedTargetPre);
+			if (isTargetTrace && minedStatePreApplied) tell(player, `§a[${debugTag}] mined-state preapply=ok`);
 
 			system.run(() => {
 				const xpTitleBatch = makeXpTitleBatch();

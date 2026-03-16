@@ -130,9 +130,34 @@ export const skillRegenConfig = {
 		tellPlayer: false,
 		// Traza: manda info del bloque detectado en cada intento de minado dentro de áreas
 		traceBreak: false,
+		// Opcional: filtra trazas por target.
+		// Soporta: "*", "minecraft:carrots", "skill:farming", "def:carrots"
+		traceTargets: [],
+		// Tag visual para mensajes de depuración.
+		tag: "regen",
 	},
 
 	runtime: {
+		cropProtection: {
+			// Anti-trample preciso: solo corrige el spot exacto bajo el jugador.
+			enabled: true,
+			// 1 tick para máxima precisión visual; subir si necesitas menos costo.
+			intervalTicks: 1,
+			// Si el pisoteo destruye el cultivo y hay snapshot reciente, restaura su estado exacto.
+			restoreDestroyedCrop: true,
+			// Ventana máxima para considerar válido el snapshot anti-trample (ms).
+			snapshotTtlMs: 1200,
+				// Elimina drops vanilla producidos por pisoteo (ej: carrot suelta al caer sobre crops).
+				suppressVanillaDrops: true,
+				// Ventana corta para suprimir el item generado por trample (ms).
+				dropSuppressTtlMs: 500,
+				// Radio alrededor del spot protegido donde se filtran esos drops.
+				dropSuppressRadius: 1.2,
+				// Lista extra opcional de item ids vanilla a filtrar en trample.
+				blockedVanillaItemIds: [],
+				// Ventana para considerar la huella anterior del jugador (sprint/salto rápido).
+				footTrailTtlMs: 350,
+		},
 		xpOrbs: {
 			maxSpawnPerBreak: 25,
 		},
@@ -231,12 +256,14 @@ export const skillRegenConfig = {
 	/** @type {BlockDefinition[]} */
 	blocks: [
 		// MVP: carbón regenerable (skill: mining)
+		
 		{
 			id: "coal",
 			skill: "mining",
 			blockId: "minecraft:*coal_ore",
 			// Área(s) habilitadas para este bloque
 			areas: ["A"],
+			
 			// Métrica específica: al minar carbón suma 1 al objective CARBON
 			scoreboardAddsOnBreak: {
 				CARBON: 1,
@@ -402,9 +429,17 @@ export const skillRegenConfig = {
 			skill: "farming",
 			blockId: "minecraft:carrots",
 			areas: ["A", "B"],
-			// mined-state específico: queremos que quede vacío mientras regenera
-			// Si por versión `minecraft:air` no se puede setear, usa "minecraft:structure_void".
+			// Fallback legacy para bloques sin ciclo de crecimiento.
 			minedBlockId: "minecraft:air",
+			growthCycle: {
+				// Solo cosecha completa cuando growth >= matureValue.
+				state: "growth",
+				matureValue: 7,
+				// Estado temporal tras cosecha exitosa.
+				seedValue: 0,
+				// Si rompen el cultivo inmaduro, se restaura al instante y no se persiste.
+				instantRestoreImmature: true,
+			},
 			regenSeconds: 12,
 			sounds: [{ id: "dig.grass", volume: 0.8, pitch: 1.1 }],
 			spread: {
@@ -419,6 +454,29 @@ export const skillRegenConfig = {
 			},
 			scoreboardAddsOnBreak: {
 				ZANAHORIAS: 1,
+			},
+			xp: {
+				base: 4,
+				scalingObjective: "ExpCosTotalH",
+				gainObjective: "SkillXpCosecha",
+				levelObjective: "SkillLvlCosecha",
+				stepPerPoints: 10,
+			},
+			xpTitle: {
+				enabled: true,
+				source: "regen_xp",
+				id: "farming_xp",
+				priority: 40,
+				durationTicks: 40,
+				content: ["§3+${xpGain} ${xpActual}/${xpRequeriment}"],
+			},
+			mutation: {
+				enabled: true,
+				objective: "MutActTotalH",
+				scoreMax: 1000,
+				drops: [
+					[90, "minecraft:carrot", 1, 1, 100, "§dZanahoria mutada", ["§5Mutación activa"]],
+				],
 			},
 			// Sin xpOrbs (omitido a propósito)
 			drops: [
@@ -437,21 +495,6 @@ export const skillRegenConfig = {
 					},
 					effects: {
 						drops: [[99, "minecraft:carrot", 1, 1, 100, "Bonus", ["§7Fortuna Cosecha A"]]],
-						xp: {
-							base: 4,
-							scalingObjective: "ExpCosTotalH",
-							gainObjective: "SkillXpCosecha",
-							levelObjective: "SkillLvlCosecha",
-							stepPerPoints: 10,
-						},
-						title: {
-							enabled: true,
-							source: "regen_xp",
-							id: "farming_xp_a",
-							priority: 30,
-							durationTicks: 30,
-							content: ["§3+${xpGain}"],
-						},
 					},
 				},
 			],

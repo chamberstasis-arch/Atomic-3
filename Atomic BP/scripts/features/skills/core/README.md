@@ -4,7 +4,7 @@
 
 Documento rector de `skills/core/`.
 
-Este modulo ya funciona como runtime compartido de `mining/` y `foraging/`. El contrato ya es consumible en produccion del addon y sigue preparado para la futura entrada de `farming/`.
+Este modulo ya funciona como runtime compartido de `mining/`, `foraging/` y `farming/`. El contrato ya es consumible en produccion del addon.
 
 ---
 

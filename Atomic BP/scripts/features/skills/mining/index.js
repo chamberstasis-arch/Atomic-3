@@ -96,8 +96,12 @@ export function reconcileMiningLevelForPlayer(player, source = "manual") {
 	return reconcileSkillForPlayer("mining", player, source);
 }
 
-export function onSkillScoreboardsApplied(player, addsMap) {
+export function onMiningScoreboardsApplied(player, addsMap) {
 	return onCoreSkillScoreboardsApplied("mining", player, addsMap);
+}
+
+export function onSkillScoreboardsApplied(player, addsMap) {
+	return onMiningScoreboardsApplied(player, addsMap);
 }
 
 export function initSkillMining(userConfig = undefined) {

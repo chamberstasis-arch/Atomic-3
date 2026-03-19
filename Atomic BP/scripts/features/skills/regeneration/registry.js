@@ -19,6 +19,11 @@ function normalizeSkill(value) {
 	return s ? s.toLowerCase() : "";
 }
 
+function normalizeFamily(value, fallback) {
+	const base = normalizeString(value || fallback);
+	return base ? base.toLowerCase() : "generic";
+}
+
 function normalizeBlockMatch(value) {
 	const raw = normalizeString(value);
 	if (!raw) return null;
@@ -332,6 +337,7 @@ function normalizeFortuneTiers(value) {
 export function normalizeBlockDefinition(blockDef, config) {
 	const id = normalizeString(blockDef && blockDef.id);
 	const skill = normalizeSkill(blockDef && blockDef.skill) || normalizeSkill(config && config.defaultSkill) || "mining";
+	const familyId = normalizeFamily(blockDef && blockDef.familyId, id || (blockDef && blockDef.blockId) || skill);
 
 	const blockIdRaw = normalizeString(blockDef && blockDef.blockId);
 	const match = normalizeBlockMatch(blockIdRaw || "");
@@ -362,6 +368,7 @@ export function normalizeBlockDefinition(blockDef, config) {
 	return {
 		id,
 		skill,
+		familyId,
 		match,
 		// Guardamos blockId exacto si aplica (útil para persistencia y debug)
 		blockId: match.kind === "exact" ? match.value : null,

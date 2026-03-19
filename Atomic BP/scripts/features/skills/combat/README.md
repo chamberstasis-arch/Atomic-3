@@ -60,8 +60,7 @@ skills/
     defense/                  ← (Pendiente) Reducción de daño por defensa en mobs
       README.md
   lecture/                    ← Centralización de lectura de lore + escritura de *TotalH
-  MIGRACION_CORE_SKILLS.md    ← Documento rector vigente de migración
-  Centralizacion.md           ← Referencia histórica/técnica de centralización
+  README.md                   ← Índice maestro actual de skills
   farming/
   fishing/
   foraging/
@@ -132,7 +131,7 @@ Aplica a:
 
 Cada estadística se descompone en cuatro capas aditivas.
 
-> **Estado actual vs migración**: el combate todavía consume algunos outputs legacy como `ProbabilidadCriticaTotal`, `DtotalH` y `MtotalH`, pero la lectura de lore ya está centralizada en `lecture/`. La dirección vigente hacia `skills/core/` está documentada en [MIGRACION_CORE_SKILLS.md](../MIGRACION_CORE_SKILLS.md).
+> **Estado actual**: el combate todavía consume algunos outputs legacy como `ProbabilidadCriticaTotal`, `DtotalH` y `MtotalH`, pero la lectura de lore ya está centralizada en `lecture/` y la progresión compartida no-combate vive en `skills/core/`.
 
 | Capa | Scoreboard planificado (ej: Daño) | Scoreboard actual (ej: Daño) | Fuente | Mutabilidad |
 |---|---|---|---|---|

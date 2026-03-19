@@ -83,8 +83,12 @@ export function reconcileForagingLevelForPlayer(player, source = "manual") {
 	return reconcileSkillForPlayer("foraging", player, source);
 }
 
-export function onForagingScoreboardsApplied(player, addsMap) {
+export function onSkillScoreboardsApplied(player, addsMap) {
 	return onCoreSkillScoreboardsApplied("foraging", player, addsMap);
+}
+
+export function onForagingScoreboardsApplied(player, addsMap) {
+	return onSkillScoreboardsApplied(player, addsMap);
 }
 
 export function initSkillForaging(userConfig = undefined) {

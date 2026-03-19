@@ -138,6 +138,20 @@ export const skillRegenConfig = {
 	},
 
 	runtime: {
+		grouping: {
+			// Ventana corta para unir bloques adyacentes al mismo grupo local.
+			windowMs: 4000,
+			// Límite de miembros por grupo local de veta.
+			maxMembersPerGroup: 12,
+			// Guardrails por scope (dimension+area+skill+family).
+			maxOpenGroupsPerScope: 40,
+			maxClosedPendingPerScope: 80,
+			maxGroupsPerScopeTotal: 120,
+			// Si no hay jugadores conectados, restaura todos los pendientes inmediatamente.
+			restoreAllWhenNoPlayers: true,
+			// Cadencia de chequeo redundante de jugadores conectados.
+			offlineCheckIntervalTicks: 100,
+		},
 		cropProtection: {
 			// Anti-trample preciso: solo corrige el spot exacto bajo el jugador.
 			enabled: true,
@@ -240,6 +254,12 @@ export const skillRegenConfig = {
 	persistence: {
 		// Key del mundo para guardar pendientes (JSON)
 		key: "atomic3:mining_regen_pending",
+		// Índice de scopes -> shard key para grupos locales.
+		groupIndexKey: "atomic3:regen_groups_index",
+		// Fallback para scopes no registrados en worldInitialize.
+		groupFallbackKey: "atomic3:regen_groups_fallback",
+		// Prefijo de shards por scope (dp por scope).
+		groupShardPrefix: "atomic3:regen_gs_",
 		// Delay de reintento al fallar restore (ms)
 		retryDelayMs: 2000,
 		// Longitud máxima del string guardado (limita tamaño del JSON).

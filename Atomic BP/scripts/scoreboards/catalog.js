@@ -69,6 +69,10 @@ function addRegenObjectives(list, seen, config) {
 		const spreadObjective = safeString(spread?.objective);
 		if (spreadObjective) addObjective(list, seen, spreadObjective, spreadObjective);
 
+		const mutation = block?.mutation && typeof block.mutation === "object" ? block.mutation : null;
+		const mutationObjective = safeString(mutation?.objective);
+		if (mutationObjective) addObjective(list, seen, mutationObjective, mutationObjective);
+
 		// Fortune tiers: escanear tiers para scoreboards (solo scoreboardAddsOnBreak)
 		const ft = block?.fortuneTiers;
 		if (ft && typeof ft === "object") {

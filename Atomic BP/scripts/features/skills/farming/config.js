@@ -14,7 +14,6 @@ export const farmingSkillConfig = {
 	rewards: {
 		fortuneObjective: "FortCosPersonalH",
 		fortunePerLevel: 4,
-		mutationObjective: "MutActPersonalH",
 		defaultScoreboardAddDRanges: [
 			{ fromLevel: 1, toLevel: 10, amount: 350 },
 			{ fromLevel: 11, toLevel: 20, amount: 500 },

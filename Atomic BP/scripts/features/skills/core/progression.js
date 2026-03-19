@@ -2,6 +2,13 @@ import { asStr, getScoreBestEffort, setScoreBestEffort, toInt } from "./scoreboa
 
 const DEFAULT_LEVEL_UP_SOUND = Object.freeze({ id: "random.levelup", volume: 1, pitch: 1 });
 const DEFAULT_LEVEL_UP_PARTICLE = Object.freeze({ id: "minecraft:totem_particle", count: 1, offset: { x: 0, y: 0, z: 0 } });
+const SKILL_GATE_OBJECTIVE = "H";
+
+function hasSkillGateEnabled(player) {
+	const gate = getScoreBestEffort(player, SKILL_GATE_OBJECTIVE);
+	if (gate == null) return false;
+	return Number(gate) >= 1;
+}
 
 function toRoman(value) {
 	let n = toInt(value, 0);
@@ -466,6 +473,7 @@ export function getSkillNextXpRequirementForDefinition(definition, currentLevel 
 export function reconcileSkillForDefinition(definition, player, source = "manual") {
 	if (!definition?.enabled || !player?.scoreboardIdentity) return false;
 	if (!Array.isArray(definition.levels) || definition.levels.length === 0) return false;
+	if (!hasSkillGateEnabled(player)) return false;
 
 	const xpRaw = getScoreBestEffort(player, definition.xpObjective);
 	const xpCurrent = Math.max(0, toInt(xpRaw, 0));
@@ -476,10 +484,15 @@ export function reconcileSkillForDefinition(definition, player, source = "manual
 	if (previousLevelRaw == null || previousLevelRaw < 1) setScoreBestEffort(player, definition.levelObjective, previousLevel);
 
 	const resolvedLevel = resolveLevel(player, definition, xpCurrent);
-	if (resolvedLevel !== previousLevel) setScoreBestEffort(player, definition.levelObjective, resolvedLevel);
+	let effectiveLevel = previousLevel;
+	if (resolvedLevel !== previousLevel) {
+		setScoreBestEffort(player, definition.levelObjective, resolvedLevel);
+		const persistedLevelRaw = getScoreBestEffort(player, definition.levelObjective);
+		effectiveLevel = Math.max(1, toInt(persistedLevelRaw, previousLevel));
+	}
 
 	const previousPrimary = getPrimaryTargetForLevel(definition, previousLevel);
-	const nextPrimary = getPrimaryTargetForLevel(definition, resolvedLevel);
+	const nextPrimary = getPrimaryTargetForLevel(definition, effectiveLevel);
 	if (definition.primaryObjective) {
 		if (definition.preserveHigherPrimary) {
 			const currentPrimary = Math.max(0, getScoreBestEffort(player, definition.primaryObjective) ?? 0);
@@ -489,20 +502,20 @@ export function reconcileSkillForDefinition(definition, player, source = "manual
 		}
 	}
 
-	if (resolvedLevel > previousLevel) {
-		const addsMap = buildLevelUpRewardAdds(definition, previousLevel + 1, resolvedLevel);
+	if (effectiveLevel > previousLevel) {
+		const addsMap = buildLevelUpRewardAdds(definition, previousLevel + 1, effectiveLevel);
 		applyAdditiveRewards(player, addsMap);
 	}
 
-	if (resolvedLevel > previousLevel || (definition.notifyOnLevelDown && resolvedLevel < previousLevel)) {
-		const levelDef = getLevelDef(definition, resolvedLevel);
-		const levelLabel = definition.buildLevelLabel({ definition, levelDef, level: resolvedLevel, previousLevel, player });
+	if (effectiveLevel > previousLevel || (definition.notifyOnLevelDown && effectiveLevel < previousLevel)) {
+		const levelDef = getLevelDef(definition, effectiveLevel);
+		const levelLabel = definition.buildLevelLabel({ definition, levelDef, level: effectiveLevel, previousLevel, player });
 		const basePayload = {
 			LevelUpSkill: levelLabel,
 			PreviousLevel: toRoman(previousLevel),
-			NextLevel: toRoman(resolvedLevel),
+			NextLevel: toRoman(effectiveLevel),
 			PreviousLevelArabic: previousLevel,
-			NextLevelArabic: resolvedLevel,
+			NextLevelArabic: effectiveLevel,
 			PreviousPrimaryReward: previousPrimary,
 			NextPrimaryReward: nextPrimary,
 		};
@@ -514,7 +527,7 @@ export function reconcileSkillForDefinition(definition, player, source = "manual
 				player,
 				levelDef,
 				previousLevel,
-				resolvedLevel,
+				effectiveLevel,
 				previousPrimary,
 				nextPrimary,
 				getLevelRewardAmount: (objectiveId) => getLevelRewardAmount(levelDef, objectiveId),
@@ -524,7 +537,7 @@ export function reconcileSkillForDefinition(definition, player, source = "manual
 		const lines = renderLevelChangeMessage(definition, payload, levelDef);
 		if (definition.sendLevelChangeMessage) definition.sendLevelChangeMessage({ definition, player, lines, payload, levelDef, source });
 		else sendMessageLines(player, lines);
-		if (resolvedLevel > previousLevel) {
+		if (effectiveLevel > previousLevel) {
 			emitLevelChangeSound(player, levelDef?.effects?.sound ?? definition.levelUpSound);
 			emitLevelChangeParticles(player, levelDef?.effects?.particle ?? definition.levelUpParticle);
 		}

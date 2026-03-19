@@ -220,6 +220,68 @@ function validateCropProtectionConfig(cropProtection, label, warnings) {
 	}
 }
 
+function validateGroupingConfig(grouping, label, warnings) {
+	if (grouping == null) return;
+	if (!isObj(grouping)) {
+		warnings.push(`${label}: grouping debería ser un objeto`);
+		return;
+	}
+	if (grouping.windowMs != null) {
+		if (!isFiniteNumber(grouping.windowMs) || Number(grouping.windowMs) < 250) {
+			warnings.push(`${label}: grouping.windowMs debería ser >= 250`);
+		}
+	}
+	if (grouping.maxMembersPerGroup != null) {
+		if (!isFiniteNumber(grouping.maxMembersPerGroup) || Number(grouping.maxMembersPerGroup) < 1) {
+			warnings.push(`${label}: grouping.maxMembersPerGroup debería ser >= 1`);
+		}
+	}
+	if (grouping.maxOpenGroupsPerScope != null) {
+		if (!isFiniteNumber(grouping.maxOpenGroupsPerScope) || Number(grouping.maxOpenGroupsPerScope) < 1) {
+			warnings.push(`${label}: grouping.maxOpenGroupsPerScope debería ser >= 1`);
+		}
+	}
+	if (grouping.maxClosedPendingPerScope != null) {
+		if (!isFiniteNumber(grouping.maxClosedPendingPerScope) || Number(grouping.maxClosedPendingPerScope) < 0) {
+			warnings.push(`${label}: grouping.maxClosedPendingPerScope debería ser >= 0`);
+		}
+	}
+	if (grouping.maxGroupsPerScopeTotal != null) {
+		if (!isFiniteNumber(grouping.maxGroupsPerScopeTotal) || Number(grouping.maxGroupsPerScopeTotal) < 1) {
+			warnings.push(`${label}: grouping.maxGroupsPerScopeTotal debería ser >= 1`);
+		}
+	}
+	if (grouping.restoreAllWhenNoPlayers != null && typeof grouping.restoreAllWhenNoPlayers !== "boolean") {
+		warnings.push(`${label}: grouping.restoreAllWhenNoPlayers debería ser boolean`);
+	}
+	if (grouping.offlineCheckIntervalTicks != null) {
+		if (!isFiniteNumber(grouping.offlineCheckIntervalTicks) || Number(grouping.offlineCheckIntervalTicks) < 1) {
+			warnings.push(`${label}: grouping.offlineCheckIntervalTicks debería ser >= 1`);
+		}
+	}
+}
+
+function validatePersistenceConfig(persistence, label, warnings) {
+	if (persistence == null) return;
+	if (!isObj(persistence)) {
+		warnings.push(`${label}: persistence debería ser un objeto`);
+		return;
+	}
+	if (persistence.key != null && !asStr(persistence.key)) warnings.push(`${label}: persistence.key inválido`);
+	if (persistence.groupIndexKey != null && !asStr(persistence.groupIndexKey)) warnings.push(`${label}: persistence.groupIndexKey inválido`);
+	if (persistence.groupFallbackKey != null && !asStr(persistence.groupFallbackKey)) warnings.push(`${label}: persistence.groupFallbackKey inválido`);
+	if (persistence.groupShardPrefix != null && !asStr(persistence.groupShardPrefix)) warnings.push(`${label}: persistence.groupShardPrefix inválido`);
+	if (persistence.maxStringLength != null && (!isFiniteNumber(persistence.maxStringLength) || Number(persistence.maxStringLength) < 1000)) {
+		warnings.push(`${label}: persistence.maxStringLength debería ser >= 1000`);
+	}
+	if (persistence.maxEntries != null && (!isFiniteNumber(persistence.maxEntries) || Number(persistence.maxEntries) < 1)) {
+		warnings.push(`${label}: persistence.maxEntries debería ser >= 1`);
+	}
+	if (persistence.retryDelayMs != null && (!isFiniteNumber(persistence.retryDelayMs) || Number(persistence.retryDelayMs) < 100)) {
+		warnings.push(`${label}: persistence.retryDelayMs debería ser >= 100`);
+	}
+}
+
 /**
  * @param {any} config
  * @returns {{ warnings: string[], errors: string[] }}
@@ -273,6 +335,8 @@ export function validateSkillRegenConfig(config) {
 	if (blocks.length === 0) warnings.push("Config: blocks está vacío (no hay bloques regenerables registrados)");
 	validateSpreadConfig(config?.runtime?.spread, "Config runtime", warnings);
 	validateCropProtectionConfig(config?.runtime?.cropProtection, "Config runtime", warnings);
+	validateGroupingConfig(config?.runtime?.grouping, "Config runtime", warnings);
+	validatePersistenceConfig(config?.persistence, "Config", warnings);
 	let usesAreaFilters = false;
 	for (const [i, b] of blocks.entries()) {
 		if (!isObj(b)) {
@@ -281,6 +345,7 @@ export function validateSkillRegenConfig(config) {
 		}
 		if (!asStr(b.id)) errors.push(`Block[${i}]: id vacío`);
 		if (!asStr(b.skill)) errors.push(`Block[${i}] (${asStr(b.id) || "?"}): skill vacío`);
+		if (b.familyId != null && !asStr(b.familyId)) warnings.push(`Block[${i}] (${asStr(b.id) || "?"}): familyId inválido`);
 		const blockId = asStr(b.blockId);
 		if (!blockId) errors.push(`Block[${i}] (${asStr(b.id) || "?"}): blockId vacío`);
 		// '*' soportado (exact/prefix/glob) por registry.js

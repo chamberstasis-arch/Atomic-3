@@ -23,16 +23,21 @@ import { validateMiningRegenConfig } from "./validate.js";
 import { upsertTemporaryTitle } from "../../../systems/titlesPriority/index.js";
 import { getSkillDefinition, getSkillNextXpRequirement, onSkillScoreboardsApplied } from "../core/index.js";
 import {
+	clearLegacyPendingEntries,
+	createGroupPersistenceContext,
 	computeRemainingTicks,
 	initSkillRegenDynamicProperties,
-	isExpired,
-	loadPendingEntries,
-	makePendingKey,
+	loadLegacyPendingEntries,
+	loadPersistedGroups,
+	makeBlockPendingKey,
+	makeGroupId,
+	makeGroupScopeId,
 	processEntriesInBatches,
-	savePendingEntries,
+	saveScopeGroups,
 } from "./persistence.js";
 
 let didInit = false;
+const SKILL_GATE_OBJECTIVE = "H";
 /** @type {Map<string, { capturedAtMs: number, cropTarget: { id: string, states?: Record<string, any> } }>} */
 const cropTrampleSnapshotBySpot = new Map();
 /** @type {Map<string, { dimensionId: string, x: number, y: number, z: number, expiresAtMs: number, blockedItemIds: string[] }>} */
@@ -45,8 +50,7 @@ function nowMs() {
 }
 
 function makeKeyFromPos(dimensionId, pos) {
-	// Formato único de key para runtime y persistencia.
-	return `${String(dimensionId)}:${pos.x}:${pos.y}:${pos.z}`;
+	return makeBlockPendingKey(dimensionId, pos);
 }
 
 function debugEnabled(config) {
@@ -343,6 +347,12 @@ function getScoreBestEffort(player, objectiveId) {
 		void e;
 		return null;
 	}
+}
+
+function hasSkillGateEnabled(player) {
+	const gate = getScoreBestEffort(player, SKILL_GATE_OBJECTIVE);
+	if (gate == null) return false;
+	return Number(gate) >= 1;
 }
 
 function resolveXpGain(xpRule, player) {
@@ -779,6 +789,10 @@ function runCropProtectionTick(config, registry) {
 			if (!dim) continue;
 			const dimensionId = String(dim.id ?? "");
 			const playerKey = makePlayerRuntimeKey(player);
+			if (!hasSkillGateEnabled(player)) {
+				if (playerKey) cropProtectionLastFootByPlayer.delete(playerKey);
+				continue;
+			}
 			const currentFarmlandPos = getFarmlandPosUnderPlayer(player);
 			if (!currentFarmlandPos) continue;
 
@@ -1148,6 +1162,94 @@ function isCreativeBestEffort(player) {
 	return false;
 }
 
+function getGroupingConfig(config) {
+	const grouping = config?.runtime?.grouping ?? {};
+	return {
+		windowMs: Math.max(250, Math.trunc(Number(grouping.windowMs ?? 4000) || 4000)),
+		maxMembersPerGroup: Math.max(1, Math.trunc(Number(grouping.maxMembersPerGroup ?? 12) || 12)),
+		maxOpenGroupsPerScope: Math.max(1, Math.trunc(Number(grouping.maxOpenGroupsPerScope ?? 40) || 40)),
+		maxClosedPendingPerScope: Math.max(0, Math.trunc(Number(grouping.maxClosedPendingPerScope ?? 80) || 80)),
+		maxGroupsPerScopeTotal: Math.max(1, Math.trunc(Number(grouping.maxGroupsPerScopeTotal ?? 120) || 120)),
+		restoreAllWhenNoPlayers: grouping.restoreAllWhenNoPlayers !== false,
+		offlineCheckIntervalTicks: Math.max(1, Math.trunc(Number(grouping.offlineCheckIntervalTicks ?? 100) || 100), 1),
+	};
+}
+
+function normalizeAreaIdForScope(value) {
+	const v = String(value != null ? value : "").trim().toLowerCase();
+	if (!v) return "";
+	return v.replace(/[^a-z0-9:_\-]/g, "_");
+}
+
+function normalizeTokenForScope(value) {
+	const v = String(value != null ? value : "").trim().toLowerCase();
+	if (!v) return "";
+	return v.replace(/[^a-z0-9:_\-]/g, "_");
+}
+
+function normalizeAreaAllowList(allowedAreaIds) {
+	if (allowedAreaIds == null) return [];
+	if (typeof allowedAreaIds === "string") {
+		const id = normalizeAreaIdForScope(allowedAreaIds);
+		return id ? [id] : [];
+	}
+	if (!Array.isArray(allowedAreaIds)) return [];
+	return allowedAreaIds.map((v) => normalizeAreaIdForScope(v)).filter(Boolean);
+}
+
+function resolveAreaIdForPos(dimensionId, pos, areas, allowedAreaIds) {
+	if (!Array.isArray(areas) || areas.length === 0) return "";
+	const allow = normalizeAreaAllowList(allowedAreaIds);
+	const allowAll = allow.length === 0 || allow.includes("*");
+	for (const area of areas) {
+		if (!area || typeof area !== "object") continue;
+		const areaId = normalizeAreaIdForScope(area.id ?? area.name);
+		if (!areaId) continue;
+		if (!allowAll && !allow.includes(areaId)) continue;
+		if (isInAnyArea(dimensionId, pos, [area], undefined)) return areaId;
+	}
+	return "";
+}
+
+function getFamilyIdForScope(blockDef, originalBlockTypeId) {
+	const family = String(blockDef?.familyId ?? blockDef?.id ?? originalBlockTypeId ?? "").trim().toLowerCase();
+	const normalized = normalizeTokenForScope(family);
+	return normalized || "generic";
+}
+
+function getOrthogonalNeighborKeys(dimensionId, pos) {
+	return [
+		makeBlockPendingKey(dimensionId, { x: pos.x + 1, y: pos.y, z: pos.z }),
+		makeBlockPendingKey(dimensionId, { x: pos.x - 1, y: pos.y, z: pos.z }),
+		makeBlockPendingKey(dimensionId, { x: pos.x, y: pos.y + 1, z: pos.z }),
+		makeBlockPendingKey(dimensionId, { x: pos.x, y: pos.y - 1, z: pos.z }),
+		makeBlockPendingKey(dimensionId, { x: pos.x, y: pos.y, z: pos.z + 1 }),
+		makeBlockPendingKey(dimensionId, { x: pos.x, y: pos.y, z: pos.z - 1 }),
+	];
+}
+
+function getBlockSafe(dimension, pos) {
+	try {
+		if (!dimension) return null;
+		return dimension.getBlock(pos) || null;
+	} catch (e) {
+		void e;
+		return null;
+	}
+}
+
+function blockMatchesTarget(block, target) {
+	const resolved = resolveBlockTarget(target);
+	if (!resolved || !block) return false;
+	if (String(block.typeId) !== resolved.id) return false;
+	if (!resolved.states) return true;
+	if (!block.permutation || typeof block.permutation.getState !== "function") return false;
+	for (const [key, expected] of Object.entries(resolved.states)) {
+		if (block.permutation.getState(key) !== expected) return false;
+	}
+	return true;
+}
+
 /**
  * Inicializa el sistema.
  * @param {any} userConfig
@@ -1188,6 +1290,8 @@ export function initMiningRegen(userConfig) {
 			config = next;
 			registry = buildBlockRegistry(config);
 			ticksPerSecond = Number(config.ticksPerSecond != null ? config.ticksPerSecond : 20) || 20;
+			groupingConfig = getGroupingConfig(config);
+			persistenceContext = createGroupPersistenceContext(config);
 			const blocksCount = Array.isArray(config.blocks)
 				? config.blocks.length
 				: 0;
@@ -1195,77 +1299,410 @@ export function initMiningRegen(userConfig) {
 		}
 	}
 
-	// Cache runtime: evita doble drop en el mismo bloque durante cooldown.
-	/** @type {Map<string, any>} */
+	let groupingConfig = getGroupingConfig(config);
+	let persistenceContext = createGroupPersistenceContext(config);
+
+	/** @type {Map<string, { groupId: string, scopeId: string }>} */
 	const pendingByKey = new Map();
-	// Keys "en vuelo": un evento ya cancelado que se procesará en el siguiente tick.
 	/** @type {Set<string>} */
 	const processingKeys = new Set();
+	/** @type {Map<string, any>} */
+	const groupsById = new Map();
+	/** @type {Map<string, Set<string>>} */
+	const groupIdsByScope = new Map();
+	/** @type {Map<string, Set<string>>} */
+	const openGroupIdsByScope = new Map();
 
-	function snapshotPendingEntries() {
-		return Array.from(pendingByKey.values());
+	function ensureScopeSet(map, scopeId) {
+		if (!map.has(scopeId)) map.set(scopeId, new Set());
+		return map.get(scopeId);
 	}
 
-	function persist() {
-		savePendingEntries(config, snapshotPendingEntries());
+	function addGroupToScopeIndexes(group) {
+		ensureScopeSet(groupIdsByScope, group.scopeId).add(group.id);
+		if (group.status === "open") ensureScopeSet(openGroupIdsByScope, group.scopeId).add(group.id);
 	}
 
-	function removePendingByKey(key) {
-		pendingByKey.delete(key);
-		persist();
+	function removeGroupFromScopeIndexes(group) {
+		const all = groupIdsByScope.get(group.scopeId);
+		if (all) {
+			all.delete(group.id);
+			if (all.size === 0) groupIdsByScope.delete(group.scopeId);
+		}
+		const open = openGroupIdsByScope.get(group.scopeId);
+		if (open) {
+			open.delete(group.id);
+			if (open.size === 0) openGroupIdsByScope.delete(group.scopeId);
+		}
 	}
 
-	function scheduleRestore(entry) {
-		const key = makePendingKey(entry);
-		pendingByKey.set(key, entry);
-		const ticks = computeRemainingTicks(entry, ticksPerSecond);
+	function markGroupOpenState(group, isOpen) {
+		const open = ensureScopeSet(openGroupIdsByScope, group.scopeId);
+		if (isOpen) open.add(group.id);
+		else open.delete(group.id);
+		if (open.size === 0) openGroupIdsByScope.delete(group.scopeId);
+	}
 
-		system.runTimeout(() => {
-			try {
-				// Verificación final: solo restaurar si aún está el minedBlockId.
+	function ensureGroupRuntimeFields(group) {
+		group.memberKeys = new Set();
+		const members = Array.isArray(group.members) ? group.members : [];
+		for (const m of members) {
+			group.memberKeys.add(makeBlockPendingKey(group.dimensionId, m));
+		}
+		group.closeToken = Number(group.closeToken || 0);
+		group.restoreToken = Number(group.restoreToken || 0);
+		group.regenMs = Math.max(1000, Math.trunc(Number(group.regenMs || (group.restoreAt - group.closeAt) || 1000)));
+		if (!group.owner || typeof group.owner !== "object") {
+			group.owner = { firstPlayerId: "", contributors: 1 };
+		}
+		group.owner.contributors = Math.max(1, Math.trunc(Number(group.owner.contributors) || 1));
+		return group;
+	}
+
+	function addGroupToRuntime(groupRaw) {
+		const group = ensureGroupRuntimeFields(groupRaw);
+		groupsById.set(group.id, group);
+		addGroupToScopeIndexes(group);
+		for (const memberKey of group.memberKeys) {
+			pendingByKey.set(memberKey, { groupId: group.id, scopeId: group.scopeId });
+		}
+		return group;
+	}
+
+	function removeGroupFromRuntime(groupId) {
+		const group = groupsById.get(groupId);
+		if (!group) return null;
+		groupsById.delete(groupId);
+		removeGroupFromScopeIndexes(group);
+		for (const memberKey of group.memberKeys || []) pendingByKey.delete(memberKey);
+		return group;
+	}
+
+	function serializeGroup(group) {
+		return {
+			id: group.id,
+			scopeId: group.scopeId,
+			dimensionId: group.dimensionId,
+			areaId: group.areaId,
+			skillId: group.skillId,
+			familyId: group.familyId,
+			status: group.status,
+			createdAt: Math.trunc(Number(group.createdAt) || nowMs()),
+			closeAt: Math.trunc(Number(group.closeAt) || nowMs()),
+			restoreAt: Math.trunc(Number(group.restoreAt) || nowMs()),
+			members: Array.isArray(group.members) ? group.members.map((m) => ({
+				x: Math.trunc(Number(m.x) || 0),
+				y: Math.trunc(Number(m.y) || 0),
+				z: Math.trunc(Number(m.z) || 0),
+				blockId: String(m.blockId ?? ""),
+				...(m.blockStates ? { blockStates: m.blockStates } : {}),
+				minedBlockId: String(m.minedBlockId ?? ""),
+				...(m.minedBlockStates ? { minedBlockStates: m.minedBlockStates } : {}),
+			})) : [],
+			owner: group.owner && typeof group.owner === "object"
+				? {
+					firstPlayerId: String(group.owner.firstPlayerId ?? ""),
+					contributors: Math.max(1, Math.trunc(Number(group.owner.contributors) || 1)),
+				}
+				: undefined,
+		};
+	}
+
+	function getScopeGroups(scopeId) {
+		const ids = groupIdsByScope.get(scopeId);
+		if (!ids || ids.size === 0) return [];
+		const out = [];
+		for (const id of ids) {
+			const g = groupsById.get(id);
+			if (g) out.push(g);
+		}
+		return out;
+	}
+
+	function persistScope(scopeId, reason = "") {
+		const groups = getScopeGroups(scopeId).map(serializeGroup);
+		const result = saveScopeGroups(persistenceContext, scopeId, groups);
+		if (!result.ok) {
+			dbg(config, `persistScope(${scopeId}) failed${reason ? ` (${reason})` : ""}`);
+			return false;
+		}
+		if (result.trimmed > 0) {
+			dbg(config, `persistScope(${scopeId}) trimmed=${result.trimmed}; forcing immediate restore`);
+			restoreScopeImmediately(scopeId, "persistence_trimmed");
+		}
+		return true;
+	}
+
+	function hydrateGroupsFromPersistence() {
+		pendingByKey.clear();
+		groupsById.clear();
+		groupIdsByScope.clear();
+		openGroupIdsByScope.clear();
+
+		const loaded = loadPersistedGroups(persistenceContext);
+		for (const loadedGroup of loaded) {
+			addGroupToRuntime({
+				...loadedGroup,
+				status: String(loadedGroup.status || "open").toLowerCase(),
+			});
+		}
+		return loaded.length;
+	}
+
+	function restoreLegacyPendingImmediately(reason) {
+		const loaded = loadLegacyPendingEntries(config);
+		if (!Array.isArray(loaded) || loaded.length === 0) return;
+		dbg(config, `${reason}: legacy pending entries=${loaded.length}`);
+
+		processEntriesInBatches(
+			config,
+			loaded,
+			(entry) => {
 				const dim = safeGetDimension(entry.dimensionId);
-				if (!dim) {
-					// Si la dimensión no existe, reintentar más adelante.
-					entry.restoreAt = nowMs() + getPersistenceRetryDelayMs(config);
-					scheduleRestore(entry);
-					persist();
-					return;
-				}
-
+				if (!dim) return;
 				const pos = { x: entry.x, y: entry.y, z: entry.z };
-				const currentMatchesMined = isBlockTargetMatch(dim, pos, {
-					id: entry.minedBlockId,
-					states: entry.minedBlockStates,
-				});
-				if (!currentMatchesMined) {
-					// Se cambió externamente: no restaurar.
-					removePendingByKey(key);
-					return;
-				}
-
+				const block = getBlockSafe(dim, pos);
+				if (!block) return;
+				if (!blockMatchesTarget(block, { id: entry.minedBlockId, states: entry.minedBlockStates })) return;
 				setBlockTypeSafe(dim, pos, { id: entry.blockId, states: entry.blockStates });
-				removePendingByKey(key);
-			} catch (e) {
-				void e;
-				// Reintento suave
-				try {
-					entry.restoreAt = nowMs() + getPersistenceRetryDelayMs(config);
-					pendingByKey.set(key, entry);
-					scheduleRestore(entry);
-					persist();
-				} catch (e2) {
-					void e2;
+			},
+			() => {
+				clearLegacyPendingEntries(config);
+			}
+		);
+	}
+
+	function resolveGroupForBlock(scopeId, dimensionId, blockPos, now) {
+		const openIds = openGroupIdsByScope.get(scopeId);
+		if (!openIds || openIds.size === 0) return null;
+		const neighborKeys = getOrthogonalNeighborKeys(dimensionId, blockPos);
+		let best = null;
+		for (const groupId of openIds) {
+			const group = groupsById.get(groupId);
+			if (!group || group.status !== "open") continue;
+			if (now > Number(group.closeAt)) continue;
+			if ((group.members?.length || 0) >= groupingConfig.maxMembersPerGroup) continue;
+			if (!group.memberKeys) continue;
+			let adjacent = false;
+			for (const nKey of neighborKeys) {
+				if (group.memberKeys.has(nKey)) {
+					adjacent = true;
+					break;
 				}
 			}
+			if (!adjacent) continue;
+			if (!best || Number(group.closeAt) > Number(best.closeAt)) best = group;
+		}
+		return best;
+	}
+
+	function scheduleGroupClose(group) {
+		if (!group || group.status !== "open") return;
+		group.closeToken = Number(group.closeToken || 0) + 1;
+		const token = group.closeToken;
+		const ticks = computeRemainingTicks({ restoreAt: group.closeAt }, ticksPerSecond);
+		system.runTimeout(() => {
+			const current = groupsById.get(group.id);
+			if (!current || current.status !== "open") return;
+			if (current.closeToken !== token) return;
+			if (nowMs() < Number(current.closeAt)) {
+				scheduleGroupClose(current);
+				return;
+			}
+			current.status = "closed";
+			markGroupOpenState(current, false);
+			scheduleGroupRestore(current);
+			persistScope(current.scopeId, "close");
 		}, ticks);
 	}
 
-	function addPending(entry) {
-		const key = makePendingKey(entry);
-		if (pendingByKey.has(key)) return false;
-		pendingByKey.set(key, entry);
-		persist();
-		scheduleRestore(entry);
+	function scheduleGroupRestore(group) {
+		if (!group) return;
+		group.restoreToken = Number(group.restoreToken || 0) + 1;
+		const token = group.restoreToken;
+		const ticks = computeRemainingTicks({ restoreAt: group.restoreAt }, ticksPerSecond);
+		system.runTimeout(() => {
+			const current = groupsById.get(group.id);
+			if (!current) return;
+			if (current.restoreToken !== token) return;
+			if (nowMs() < Number(current.restoreAt)) {
+				scheduleGroupRestore(current);
+				return;
+			}
+			performGroupRestore(current.id, false, "timer");
+		}, ticks);
+	}
+
+	function performGroupRestore(groupId, force, reason) {
+		const group = groupsById.get(groupId);
+		if (!group) return false;
+		if (!force && group.status === "open") return false;
+		if (force && group.status === "open") {
+			group.status = "closed";
+			markGroupOpenState(group, false);
+		}
+
+		const dim = safeGetDimension(group.dimensionId);
+		if (!dim) {
+			group.status = "restoring";
+			group.restoreAt = nowMs() + getPersistenceRetryDelayMs(config);
+			scheduleGroupRestore(group);
+			persistScope(group.scopeId, `retry_dim_${reason}`);
+			return false;
+		}
+
+		let unresolved = 0;
+		for (const member of group.members || []) {
+			const pos = { x: member.x, y: member.y, z: member.z };
+			const block = getBlockSafe(dim, pos);
+			if (!block) {
+				unresolved++;
+				continue;
+			}
+
+			const minedTarget = { id: member.minedBlockId, states: member.minedBlockStates };
+			const restoreTarget = { id: member.blockId, states: member.blockStates };
+			if (blockMatchesTarget(block, restoreTarget)) continue;
+			if (!blockMatchesTarget(block, minedTarget)) continue;
+
+			const restored = setBlockTypeSafe(dim, pos, restoreTarget);
+			if (!restored) unresolved++;
+		}
+
+		if (unresolved > 0) {
+			group.status = "restoring";
+			group.restoreAt = nowMs() + getPersistenceRetryDelayMs(config);
+			scheduleGroupRestore(group);
+			persistScope(group.scopeId, `retry_chunks_${reason}`);
+			return false;
+		}
+
+		const removed = removeGroupFromRuntime(group.id);
+		if (removed) persistScope(removed.scopeId, `done_${reason}`);
+		return true;
+	}
+
+	function restoreScopeImmediately(scopeId, reason) {
+		const ids = Array.from(groupIdsByScope.get(scopeId) || []);
+		for (const groupId of ids) {
+			performGroupRestore(groupId, true, reason);
+		}
+	}
+
+	function restoreAllGroupsImmediately(reason) {
+		const ids = Array.from(groupsById.keys());
+		if (ids.length === 0) return;
+		dbg(config, `${reason}: restoring groups=${ids.length}`);
+		processEntriesInBatches(
+			config,
+			ids,
+			(groupId) => {
+				performGroupRestore(groupId, true, reason);
+			},
+			() => {
+				dbg(config, `${reason}: restore complete`);
+			}
+		);
+	}
+
+	function enforceScopeGuardrails(scopeId) {
+		const groups = getScopeGroups(scopeId);
+		if (groups.length === 0) return;
+
+		const open = groups.filter((g) => g.status === "open");
+		const closedLike = groups.filter((g) => g.status !== "open");
+		const overOpen = open.length - groupingConfig.maxOpenGroupsPerScope;
+		const overClosed = closedLike.length - groupingConfig.maxClosedPendingPerScope;
+		const overTotal = groups.length - groupingConfig.maxGroupsPerScopeTotal;
+		const toDrain = Math.max(0, overOpen, overClosed, overTotal);
+		if (toDrain <= 0) return;
+
+		const candidates = groups
+			.slice()
+			.sort((a, b) => Number(a.closeAt) - Number(b.closeAt));
+		for (let i = 0; i < toDrain && i < candidates.length; i++) {
+			performGroupRestore(candidates[i].id, true, "guardrail");
+		}
+	}
+
+	function addBlockToLocalGroup({
+		player,
+		dimensionId,
+		blockPos,
+		blockDef,
+		originalBlockTypeId,
+		resolvedRestoreTarget,
+		resolvedMinedTarget,
+	}) {
+		const areaId = resolveAreaIdForPos(
+			dimensionId,
+			blockPos,
+			Array.isArray(config?.areas) ? config.areas : [],
+			blockDef?.areaIds
+		);
+		if (!areaId) return false;
+		const skillId = normalizeTokenForScope(blockDef?.skill);
+		if (!skillId) return false;
+		const familyId = getFamilyIdForScope(blockDef, originalBlockTypeId);
+		const scopeId = makeGroupScopeId({ dimensionId, areaId, skillId, familyId });
+		const blockKey = makeKeyFromPos(dimensionId, blockPos);
+		if (pendingByKey.has(blockKey)) return false;
+
+		enforceScopeGuardrails(scopeId);
+
+		const now = nowMs();
+		const regenMs = Math.max(1000, Math.trunc(Number(blockDef?.regenSeconds || 1) * 1000));
+		let group = resolveGroupForBlock(scopeId, dimensionId, blockPos, now);
+
+		if (!group) {
+			group = addGroupToRuntime({
+				id: makeGroupId(scopeId),
+				scopeId,
+				dimensionId,
+				areaId,
+				skillId,
+				familyId,
+				status: "open",
+				createdAt: now,
+				closeAt: now + groupingConfig.windowMs,
+				restoreAt: now + regenMs,
+				regenMs,
+				members: [],
+				owner: {
+					firstPlayerId: makePlayerRuntimeKey(player),
+					contributors: 1,
+				},
+			});
+		}
+
+		if (group.status !== "open") return false;
+		if ((group.members?.length || 0) >= groupingConfig.maxMembersPerGroup) return false;
+
+		const member = {
+			x: blockPos.x,
+			y: blockPos.y,
+			z: blockPos.z,
+			blockId: resolvedRestoreTarget?.id ?? originalBlockTypeId,
+			blockStates: resolvedRestoreTarget?.states ?? undefined,
+			minedBlockId: resolvedMinedTarget?.id ?? blockDef.minedBlockId,
+			minedBlockStates: resolvedMinedTarget?.states ?? undefined,
+		};
+		const memberKey = makeKeyFromPos(dimensionId, member);
+		if (!group.memberKeys.has(memberKey)) {
+			group.members.push(member);
+			group.memberKeys.add(memberKey);
+			pendingByKey.set(memberKey, { groupId: group.id, scopeId });
+			const playerKey = makePlayerRuntimeKey(player);
+			if (playerKey && group.owner.firstPlayerId !== playerKey) {
+				group.owner.contributors = Math.max(1, Number(group.owner.contributors || 1) + 1);
+			}
+		}
+
+		group.closeAt = now + groupingConfig.windowMs;
+		group.restoreAt = now + regenMs;
+		group.regenMs = Math.max(group.regenMs || regenMs, regenMs);
+		scheduleGroupClose(group);
+		persistScope(scopeId, "add_member");
 		return true;
 	}
 
@@ -1273,6 +1710,7 @@ export function initMiningRegen(userConfig) {
 		try {
 			if (!config || !config.enabled) return false;
 			if (isCreativeBestEffort(player)) return false;
+			if (!hasSkillGateEnabled(player)) return false;
 			const debugTag = getDebugTag(config);
 			const growthTargets = getGrowthCycleTargets(blockDef, originalBlockTypeId);
 			const minedTarget = growthTargets?.minedTarget ?? blockDef.minedBlockId;
@@ -1375,17 +1813,19 @@ export function initMiningRegen(userConfig) {
 				onSkillScoreboardsApplied(normalizeSkillId(blockDef?.skill), player, merged);
 			}
 
-			addPending({
+			const grouped = addBlockToLocalGroup({
+				player,
 				dimensionId,
-				x: blockPos.x,
-				y: blockPos.y,
-				z: blockPos.z,
-				blockId: resolvedRestoreTarget?.id ?? originalBlockTypeId,
-				blockStates: resolvedRestoreTarget?.states ?? undefined,
-				minedBlockId: resolvedMinedTarget?.id ?? blockDef.minedBlockId,
-				minedBlockStates: resolvedMinedTarget?.states ?? undefined,
-				restoreAt: nowMs() + blockDef.regenSeconds * 1000,
+				blockPos,
+				blockDef,
+				originalBlockTypeId,
+				resolvedRestoreTarget,
+				resolvedMinedTarget,
 			});
+			if (!grouped) {
+				setBlockTypeSafe(dim, blockPos, { id: resolvedRestoreTarget?.id ?? originalBlockTypeId, states: resolvedRestoreTarget?.states });
+				return false;
+			}
 
 			if (allowSpread) {
 				const spreadPlan = resolveSpreadTargets({
@@ -1433,68 +1873,55 @@ export function initMiningRegen(userConfig) {
 		}
 	}
 
-	// Boot restore:
-	// - Si el mundo se cerró con bloques en mined-state, al volver a entrar los restauramos ENSEGUIDA.
-	// - Esto evita acumulación de entries y elimina el caso "se queda eterno" si un timer no se reprograma.
-	function restoreAllPendingImmediately(reason) {
+	function maybeRestoreAllIfNoPlayers(reason) {
+		if (!groupingConfig.restoreAllWhenNoPlayers) return;
+		let players = [];
 		try {
-			dbg(config, `${reason}: cargando pendientes...`);
-			const loaded = loadPendingEntries(config);
-			pendingByKey.clear();
-			for (const e of loaded) {
-				const k = makePendingKey(e);
-				const prev = pendingByKey.get(k);
-				if (!prev || Number(e.restoreAt) < Number(prev.restoreAt)) pendingByKey.set(k, e);
-			}
-			dbg(config, `${reason}: pendientes=${pendingByKey.size}`);
+			players = Array.from(world.getPlayers());
+		} catch (e) {
+			void e;
+			players = [];
+		}
+		if (players.length > 0) return;
+		restoreAllGroupsImmediately(reason);
+	}
 
-			processEntriesInBatches(
-				config,
-				snapshotPendingEntries(),
-				(entry) => {
-					const key = makePendingKey(entry);
-					const dim = safeGetDimension(entry.dimensionId);
-					if (!dim) {
-						removePendingByKey(key);
-						return;
-					}
-
-					const pos = { x: entry.x, y: entry.y, z: entry.z };
-					const currentMatchesMined = isBlockTargetMatch(dim, pos, {
-						id: entry.minedBlockId,
-						states: entry.minedBlockStates,
-					});
-					if (!currentMatchesMined) {
-						removePendingByKey(key);
-						return;
-					}
-
-					// Restaurar SIEMPRE al iniciar (sin importar restoreAt)
-					setBlockTypeSafe(dim, pos, { id: entry.blockId, states: entry.blockStates });
-					removePendingByKey(key);
-				},
-				() => {
-					// Al final, persistimos la lista actual (idealmente vacía)
-					persist();
-					dbg(config, `${reason}: restore complete`);
-				}
-			);
+	function bootstrapFromPersistence(reason) {
+		try {
+			const loaded = hydrateGroupsFromPersistence();
+			dbg(config, `${reason}: hydrated groups=${loaded}`);
+			restoreAllGroupsImmediately(reason);
+			restoreLegacyPendingImmediately(`${reason}:legacy`);
 		} catch (e) {
 			void e;
 		}
 	}
 
-	// Ejecutar restore en el primer tick (evita early_execution)
-	system.run(() => restoreAllPendingImmediately("boot"));
+	system.run(() => bootstrapFromPersistence("boot"));
 
-	// Mantener worldLoad como redundancia (según versión/API puede o no disparar)
 	try {
 		world?.afterEvents?.worldLoad?.subscribe?.(() => {
-			system.run(() => restoreAllPendingImmediately("worldLoad"));
+			system.run(() => bootstrapFromPersistence("worldLoad"));
 		});
 	} catch (e) {
 		void e;
 	}
+
+	try {
+		world?.afterEvents?.playerLeave?.subscribe?.(() => {
+			system.run(() => maybeRestoreAllIfNoPlayers("allPlayersLeft"));
+		});
+	} catch (e) {
+		void e;
+	}
+
+	system.runInterval(() => {
+		try {
+			maybeRestoreAllIfNoPlayers("offlineCheck");
+		} catch (e) {
+			void e;
+		}
+	}, groupingConfig.offlineCheckIntervalTicks);
 
 	// Anti-grief de cultivos: restaura soporte de farmland en spots gestionados
 	// con costo acotado (solo revisa columna bajo cada jugador).
@@ -1543,6 +1970,12 @@ export function initMiningRegen(userConfig) {
 
 			// Bypass Creative
 			if (isCreativeBestEffort(player)) return;
+
+			// Gate de skills: todo el sistema de regeneración/progresión requiere H >= 1.
+			if (!hasSkillGateEnabled(player)) {
+				if (traceEnabled) tell(player, `§c[${debugTag}] gate H<1 (skip)`);
+				return;
+			}
 
 			const block = ev.block;
 			const blockPos = block.location;

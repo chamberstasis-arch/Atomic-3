@@ -156,9 +156,12 @@ Ejemplo (`content: ["+${xpGain} ${xpActual}/${xpRequeriment}"]`):
 - Lógica best-effort con `try/catch` en puntos de IO/runtime para no romper el servidor.
 
 ## Persistencia
-- Solo persisten pendientes de regeneración (`dimensionId,x,y,z,blockId,minedBlockId,restoreAt`).
-- Al boot/worldLoad restaura entradas válidas y limpia huérfanas.
+- La persistencia principal opera por **grupos locales de veta** (scope `dimension+area+skill+family`) en `dynamic properties` shardizadas por scope.
+- Cada grupo mantiene `status` (`open|closed|restoring`), `closeAt`, `restoreAt` y `members`.
+- Al boot/worldLoad se restauran pendientes de forma inmediata para limpiar estado offline.
+- Existe migración legacy de entries por bloque (`key` histórico) para compatibilidad de mundos antiguos.
 
 ## Estado de documentación
 Este archivo es la fuente vigente del módulo `regeneration`.
+La especificación de arquitectura para grupos locales de veta (modelo D), límites de `dynamic properties`, capacidad estimada y flujo Mermaid está en `LOCAL_VEIN_GROUPS.md`.
 `IMPROVEMENT.md` fue retirado por estar desfasado respecto a la implementación actual.

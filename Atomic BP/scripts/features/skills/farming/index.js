@@ -83,8 +83,12 @@ export function reconcileFarmingLevelForPlayer(player, source = "manual") {
 	return reconcileSkillForPlayer("farming", player, source);
 }
 
-export function onFarmingScoreboardsApplied(player, addsMap) {
+export function onSkillScoreboardsApplied(player, addsMap) {
 	return onCoreSkillScoreboardsApplied("farming", player, addsMap);
+}
+
+export function onFarmingScoreboardsApplied(player, addsMap) {
+	return onSkillScoreboardsApplied(player, addsMap);
 }
 
 export function initSkillFarming(userConfig = undefined) {

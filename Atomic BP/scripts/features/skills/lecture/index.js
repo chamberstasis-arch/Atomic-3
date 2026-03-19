@@ -120,7 +120,7 @@ function tickLecture(cfg) {
 		if (playerKey) active.add(playerKey);
 
 		const enabledScore = getScoreIdentityOrDefault(GATE_OBJECTIVE, identity, player.name, 0);
-		const enabled = Number(enabledScore) === 1;
+		const enabled = Number(enabledScore) >= 1;
 
 		const prev = playerKey ? cacheByPlayerKey.get(playerKey) || null : null;
 
@@ -219,7 +219,7 @@ export function initLecture(userConfig = lectureConfig) {
 				if (!player) return;
 				const identity = player.scoreboardIdentity;
 				const enabledScore = getScoreIdentityOrDefault(GATE_OBJECTIVE, identity, player.name, 0);
-				if (Number(enabledScore) !== 1) return;
+				if (Number(enabledScore) < 1) return;
 				ensurePersonalDefaults(cfg, player, identity);
 			} catch (e) {
 				void e;

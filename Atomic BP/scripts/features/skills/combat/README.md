@@ -16,12 +16,14 @@ Módulo central del sistema de combate custom. Agrupa toda la lógica relacionad
 skills/
   combat/
     README.md                 ← Este documento (master)
-    calc/                      ← Fórmula de daño final (lee *TotalH de lecture/)
+    calc/                      ← Fórmula de daño final + mitigación defensiva
       README.md
       config.js
       index.js
       scoreboard.js
       utilMath.js
+      defense/
+        README.md
     health/                   ← Vida custom por scoreboards (players + mobs)
       README.md
       index.js 
@@ -57,8 +59,8 @@ skills/
       scoreboard.js
       hologram.js
       particles.js
-    defense/                  ← (Pendiente) Reducción de daño por defensa en mobs
-      README.md
+    defense/                  ← (Deprecado) referencia histórica del módulo
+      README.md               ← Redirige a calc/defense
   lecture/                    ← Centralización de lectura de lore + escritura de *TotalH
   README.md                   ← Índice maestro actual de skills
   farming/
@@ -199,6 +201,10 @@ Detalles completos en [combat/calc/README.md](calc/README.md).
 **Entradas**: `DanoTotalH`, `PoderTotalH`, `DanoCritTotalH`, `ProbCritTotalH`, `MATotalH`, `MMTotalH` (y totales de defensa/mana).
 **Salidas**: `DanoFinalSC`, `DanoFinalCC`, `ProbabilidadCriticaTotal`, `DtotalH`, `MtotalH`.
 
+Compatibilidad de transición:
+- Entrada crítica: prioriza `ProbCritTotalH` y mantiene compatibilidad con `ProbabilidadCriticaTotal`.
+- Entrada de defensa: prioriza `DefensaTotalH` y mantiene compatibilidad con `DtotalH`.
+
 Optimizaciones implementadas:
 - **Cache por jugador e inputs relevantes**: solo recalcula cuando cambian los totals o entradas relevantes consumidas por el calculador.
 - **Escritura condicional**: solo actualiza scoreboards si el valor calculado difiere del anterior.
@@ -229,6 +235,10 @@ Aplica el daño calculado al scoreboard `Vida` cuando ocurre un golpe melee. No 
 Flujos soportados:
 - **Player → Entity**: usa `DanoFinalSC`/`DanoFinalCC` + roll de crítico con `ProbabilidadCriticaTotal`. Reduce por defensa enemiga (`DtotalH`).
 - **Mob → Player**: usa `DMGH` del mob. Reduce por defensa del jugador (`DtotalH`).
+
+Compatibilidad actual de scoreboards:
+- Defensa objetivo: intenta `DefensaTotalH` y usa `DtotalH` como fallback.
+- Probabilidad de crítico: intenta `ProbCritTotalH` y usa `ProbabilidadCriticaTotal` como fallback.
 
 Fórmula de reducción por defensa:
 
@@ -277,9 +287,15 @@ El daño de efectos **ignora** `VidaAbsorcion` (bypasea la absorción).
 
 Detalles en [effects/EFFECTS.md](effects/EFFECTS.md).
 
-### 4.7 `defense/` — Defensa de mobs (pendiente)
+### 4.7 `calc/defense` — Mitigación de daño
 
-Planificado para documentar estadísticas defensivas de mobs (resistencias, inmunidades, reducciones especiales).
+La responsabilidad de mitigación defensiva se define bajo `combat/calc/defense`.
+
+Objetivo de diseño:
+- centralizar la fórmula defensiva y futuras mitigaciones (resistencias/caps/inmunidades) en una capa explícita,
+- evitar que `damage_dealt` sea dueño de reglas de mitigación.
+
+Referencia: [combat/calc/defense/README.md](calc/defense/README.md).
 
 ---
 
@@ -448,6 +464,18 @@ DanoTotalH          ← Suma de las tres capas anteriores
 ```
 
 Esto reemplaza gradualmente los scoreboards base legacy (`DMGH`, `CDH`, `CCH`, `DH`, `MH`) con una nomenclatura uniforme, manteniendo outputs legacy de `combat/calc/` mientras existan consumidores de compatibilidad.
+
+### 9.4 Estado de integración con `skills/core`
+
+`combat/` todavía no está integrado al sistema de progresión por niveles de `skills/core/`.
+
+Estado actual:
+- `combat/` consume principalmente scoreboards producidos por `lecture/` y `calc/`.
+- Los niveles de skills no-combate (`mining`, `foraging`, `farming`) viven en `core/` y no gobiernan aún curvas de combate.
+
+Dirección recomendada para siguiente fase:
+- Definir un `skillId` de combate o sub-skills de combate en `core/`.
+- Delegar progresión/recompensas de combate al `core` (sin mover fórmulas de daño fuera de `combat/calc`).
 
 ---
 

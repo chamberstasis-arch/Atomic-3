@@ -27,6 +27,7 @@ Esto es un **prerrequisito** para implementar luego el sistema de daño custom (
 - `index.js`
   - Mantiene un loop ligero (default cada 10 ticks) para cachear si el jugador está enabled (H==1).
   - Tag opcional `hp_mode` (solo debug): sirve para confirmar estado con `/tag @s list`.
+  - API pública: `initVanillaDamageCancel(options?)`.
   - Cancela daño:
     - Preferido: `world.beforeEvents.entityHurt` y `ev.cancel = true`.
     - Fallback: `world.afterEvents.entityHurt` restaura HP sumando `ev.damage`.

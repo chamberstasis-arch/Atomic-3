@@ -137,6 +137,10 @@ Default exportado en `config.js`:
 - `rateLimit` (opcional)
 - `debug` (bool)
 
+Estado por defecto de `rateLimit`:
+- `enabled: false`
+- `minTicksPerAttacker: 2`
+
 Ejemplo:
 
 ```js

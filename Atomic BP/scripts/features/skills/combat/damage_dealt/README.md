@@ -10,16 +10,16 @@ No recalcula lore ni stats: **consume** los scoreboards ya calculados por `skill
 
 ## Gate global (OBLIGATORIO)
 
-Este sistema SOLO corre si **ambas** entidades cumplen:
+Este sistema aplica el gate por flujo:
 
-- `H == 1` en el atacante
-- `H == 1` en el objetivo
+- **Player -> Entity**: requiere `H == 1` en atacante y objetivo.
+- **Mob -> Player**: requiere `H == 1` en el objetivo (player).
 
 Equivalente vanilla:
 
 - `/scoreboard players test <Entidad> H 1..`
 
-Si el atacante o el objetivo no tienen `H==1`, el sistema hace **early-exit** y NO modifica `Vida`.
+Si no se cumple el gate del flujo correspondiente, el sistema hace **early-exit** y NO modifica `Vida`.
 
 ---
 
@@ -55,9 +55,11 @@ Scoreboards relevantes (IDs ASCII):
 - Atacante (player):
 	- `DanoFinalSC` (int) — daño teórico sin crítico
 	- `DanoFinalCC` (int) — daño teórico con crítico
-	- `ProbabilidadCriticaTotal` (0..100; si falta, 0)
+	- `ProbCritTotalH` (0..100; prioritario)
+	- `ProbabilidadCriticaTotal` (0..100; fallback legacy)
 - Objetivo (entidad):
-	- `DtotalH` (int) — defensa total (si falta, 0)
+	- `DefensaTotalH` (int; prioritario)
+	- `DtotalH` (int; fallback legacy)
 
 Nota: este feature no calcula ni inicializa `VidaMaxTotalH`; solo consume los outputs que ya llegan desde el pipeline de combate.
 
@@ -118,9 +120,15 @@ Inputs (por `skills/combat/calc`):
 - Atacante jugador:
 	- `DanoFinalSC`
 	- `DanoFinalCC`
+	- `ProbCritTotalH` (si existe)
 	- `ProbabilidadCriticaTotal`
 - Objetivo:
+	- `DefensaTotalH` (si existe)
 	- `DtotalH`
+
+Internos de tracking/cooldown:
+- `LastKillerId`
+- `LastKillTick`
 
 Inputs para mobs (MVP):
 
@@ -169,18 +177,18 @@ Inputs (atacante):
 
 - `DanoFinalSC` (int)
 - `DanoFinalCC` (int)
-- `ProbabilidadCriticaTotal` (0..100; si no existe, 0)
+- `ProbCritTotalH` (0..100; si no existe, fallback a `ProbabilidadCriticaTotal`)
 
 Inputs (objetivo):
 
-- `DtotalH` (defensaEnemigo; si no existe, 0)
+- `DefensaTotalH` (defensaEnemigo; si no existe, fallback a `DtotalH`)
 - `Vida` (vida actual; si no existe, tratar como 0 o hacer early-exit según config)
 
 Paso 1: decidir crítico
 
-- `isCrit = random(0..100) < ProbabilidadCriticaTotal`
-- Si `ProbabilidadCriticaTotal >= 100` => crítico garantizado
-- Si `ProbabilidadCriticaTotal <= 0` => nunca crítico
+- `isCrit = random(0..100) < ProbCritTotalH`
+- Si `ProbCritTotalH >= 100` => crítico garantizado
+- Si `ProbCritTotalH <= 0` => nunca crítico
 
 Paso 2: elegir danoBase
 
@@ -230,7 +238,7 @@ Inputs (mob):
 
 Inputs (player):
 
-- `DtotalH` (defensaJugador; si no existe, 0)
+- `DefensaTotalH` (defensaJugador; si no existe, fallback a `DtotalH`)
 - `Vida`
 
 Fórmula:

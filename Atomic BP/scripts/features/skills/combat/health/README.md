@@ -21,7 +21,7 @@ Reglas:
 Caso especial:
 - Si `VidaMaxTotalH==0`, se trata como **inmortal lógica** (no se ejecuta kill por `Vida<=0`).
 
-## Absorción (corazones amarillos) — Opción A
+## Absorción (corazones amarillos) — Implementación actual
 
 Objetivo: que la absorción vanilla (p.ej. manzana de oro) **no rompa** el sistema de vida, tratándola como una “bolsa” aparte.
 

@@ -478,6 +478,15 @@ function normalizeBlockPosFromLocation(loc) {
 	return { x: Math.floor(x), y: Math.floor(y), z: Math.floor(z) };
 }
 
+function getEntityLocationSafe(loc) {
+	if (!loc) return null;
+	const x = Number(loc.x);
+	const y = Number(loc.y);
+	const z = Number(loc.z);
+	if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
+	return { x, y, z };
+}
+
 function makePlayerRuntimeKey(player) {
 	const pid = String(player?.id ?? "").trim();
 	if (pid) return pid;
@@ -552,6 +561,10 @@ function getCropProtectionConfig(config) {
 	const blockedVanillaItemIds = Array.isArray(raw?.blockedVanillaItemIds)
 		? raw.blockedVanillaItemIds.map((v) => String(v ?? "").trim()).filter(Boolean)
 		: [];
+	const rawAreas = raw?.areaIds ?? raw?.areas;
+	const areaIds = Array.isArray(rawAreas)
+		? rawAreas.map((v) => normalizeAreaIdForScope(v)).filter(Boolean)
+		: (typeof rawAreas === "string" ? [normalizeAreaIdForScope(rawAreas)].filter(Boolean) : []);
 	const footTrailTtlMs = Math.max(50, Math.trunc(Number(raw?.footTrailTtlMs ?? 350) || 350));
 	return {
 		enabled,
@@ -562,8 +575,15 @@ function getCropProtectionConfig(config) {
 		dropSuppressTtlMs,
 		dropSuppressRadius,
 		blockedVanillaItemIds,
+		areaIds,
 		footTrailTtlMs,
 	};
+}
+
+function isInCropProtectionScopeAreas(dimensionId, pos, areas, cropProtection) {
+	const allow = Array.isArray(cropProtection?.areaIds) ? cropProtection.areaIds : [];
+	if (allow.length === 0 || allow.includes("*")) return true;
+	return isInAnyArea(dimensionId, pos, areas, allow);
 }
 
 function inferVanillaTrampleDropItemIds(cropBlockId) {
@@ -605,9 +625,9 @@ function markTrampleDropSuppression(context) {
 	const spotKey = makeKeyFromPos(dimensionId, farmlandPos);
 	cropTrampleDropSuppressionBySpot.set(spotKey, {
 		dimensionId,
-		x: farmlandPos.x,
+		x: farmlandPos.x + 0.5,
 		y: farmlandPos.y + 1,
-		z: farmlandPos.z,
+		z: farmlandPos.z + 0.5,
 		expiresAtMs: nowMs() + cropProtection.dropSuppressTtlMs,
 		blockedItemIds,
 	});
@@ -649,11 +669,12 @@ function trySuppressVanillaTrampleDrop(config, entity) {
 	const itemId = getItemEntityStackTypeIdSafe(entity);
 	if (!itemId) return false;
 
-	const pos = normalizeBlockPosFromLocation(entity.location);
+	const pos = getEntityLocationSafe(entity.location);
 	const dimId = String(entity.dimension?.id ?? "");
 	if (!pos || !dimId) return false;
 
 	const radiusSq = cropProtection.dropSuppressRadius * cropProtection.dropSuppressRadius;
+	const maxDy = 1.2;
 	const now = nowMs();
 
 	for (const [k, entry] of cropTrampleDropSuppressionBySpot.entries()) {
@@ -666,10 +687,12 @@ function trySuppressVanillaTrampleDrop(config, entity) {
 		const dx = pos.x - entry.x;
 		const dy = pos.y - entry.y;
 		const dz = pos.z - entry.z;
+		if (Math.abs(dy) > maxDy) continue;
 		const distSq = dx * dx + dy * dy + dz * dz;
 		if (distSq > radiusSq) continue;
 		try {
 			entity.remove();
+			cropTrampleDropSuppressionBySpot.delete(k);
 			if (debugEnabled(config)) dbg(config, `cropProtection: suppressed vanilla drop ${itemId}`);
 			return true;
 		} catch (e) {
@@ -716,7 +739,12 @@ function tryProtectFarmlandSpot(context) {
 
 	if (aboveType) {
 		const managedDef = getBlockDefinition(registry, aboveType);
-		if (managedDef?.growthCycle && isInAnyArea(dimensionId, abovePos, areas, managedDef.areaIds)) {
+		if (
+			managedDef?.growthCycle
+			&& managedDef?.skill === "farming"
+			&& isInAnyArea(dimensionId, abovePos, areas, managedDef.areaIds)
+			&& isInCropProtectionScopeAreas(dimensionId, abovePos, areas, cropProtection)
+		) {
 			recordCropSnapshotAtSpot(dimension, dimensionId, farmlandPos, aboveType);
 
 			if (!isFarmlandType(supportType) && isLikelyFarmlandTrampleResult(supportType)) {
@@ -1301,6 +1329,7 @@ export function initMiningRegen(userConfig) {
 
 	let groupingConfig = getGroupingConfig(config);
 	let persistenceContext = createGroupPersistenceContext(config);
+	const persistRetryTokenByScope = new Map();
 
 	/** @type {Map<string, { groupId: string, scopeId: string }>} */
 	const pendingByKey = new Map();
@@ -1420,17 +1449,39 @@ export function initMiningRegen(userConfig) {
 	}
 
 	function persistScope(scopeId, reason = "") {
-		const groups = getScopeGroups(scopeId).map(serializeGroup);
-		const result = saveScopeGroups(persistenceContext, scopeId, groups);
-		if (!result.ok) {
+		let attempt = 0;
+		while (attempt < 2) {
+			const groups = getScopeGroups(scopeId).map(serializeGroup);
+			const result = saveScopeGroups(persistenceContext, scopeId, groups);
+			if (result.ok && result.trimmed <= 0) {
+				persistRetryTokenByScope.delete(scopeId);
+				return true;
+			}
+			if (result.trimmed > 0 && attempt === 0) {
+				dbg(config, `persistScope(${scopeId}) over-budget trimmed=${result.trimmed}; applying guardrails and retry`);
+				enforceScopeGuardrails(scopeId);
+				attempt++;
+				continue;
+			}
 			dbg(config, `persistScope(${scopeId}) failed${reason ? ` (${reason})` : ""}`);
+			schedulePersistScopeRetry(scopeId, reason || "unknown");
 			return false;
 		}
-		if (result.trimmed > 0) {
-			dbg(config, `persistScope(${scopeId}) trimmed=${result.trimmed}; forcing immediate restore`);
-			restoreScopeImmediately(scopeId, "persistence_trimmed");
-		}
-		return true;
+		schedulePersistScopeRetry(scopeId, reason || "unknown");
+		return false;
+	}
+
+	function schedulePersistScopeRetry(scopeId, reason = "") {
+		if (!scopeId) return;
+		const token = Number(persistRetryTokenByScope.get(scopeId) || 0) + 1;
+		persistRetryTokenByScope.set(scopeId, token);
+		const retryMs = getPersistenceRetryDelayMs(config);
+		const retryTicks = Math.max(20, Math.ceil(retryMs / 50));
+		system.runTimeout(() => {
+			const currentToken = Number(persistRetryTokenByScope.get(scopeId) || 0);
+			if (currentToken !== token) return;
+			persistScope(scopeId, `retry:${reason}`);
+		}, retryTicks);
 	}
 
 	function hydrateGroupsFromPersistence() {
@@ -1788,6 +1839,20 @@ export function initMiningRegen(userConfig) {
 				void e;
 			}
 
+			const grouped = addBlockToLocalGroup({
+				player,
+				dimensionId,
+				blockPos,
+				blockDef,
+				originalBlockTypeId,
+				resolvedRestoreTarget,
+				resolvedMinedTarget,
+			});
+			if (!grouped) {
+				setBlockTypeSafe(dim, blockPos, { id: resolvedRestoreTarget?.id ?? originalBlockTypeId, states: resolvedRestoreTarget?.states });
+				return false;
+			}
+
 			const spawned = runDropsTable(dim, blockPos, finalDropsTable);
 			spawnXpOrbsBestEffort(config, dim, blockPos, blockDef);
 			if (debugTellPlayer(config)) tell(player, `§7[${debugTag}] drops=${spawned} skill=${blockDef.skill} regen=${blockDef.regenSeconds}s`);
@@ -1811,20 +1876,6 @@ export function initMiningRegen(userConfig) {
 			if (merged) {
 				applyScoreboardAddsBestEffort(config, dim, player, merged);
 				onSkillScoreboardsApplied(normalizeSkillId(blockDef?.skill), player, merged);
-			}
-
-			const grouped = addBlockToLocalGroup({
-				player,
-				dimensionId,
-				blockPos,
-				blockDef,
-				originalBlockTypeId,
-				resolvedRestoreTarget,
-				resolvedMinedTarget,
-			});
-			if (!grouped) {
-				setBlockTypeSafe(dim, blockPos, { id: resolvedRestoreTarget?.id ?? originalBlockTypeId, states: resolvedRestoreTarget?.states });
-				return false;
 			}
 
 			if (allowSpread) {
@@ -2012,7 +2063,12 @@ export function initMiningRegen(userConfig) {
 
 			// Sembrar snapshot anti-trample desde el evento de break para cubrir sprint/break rápido
 			// sin depender de que el jugador siga parado exactamente encima del cultivo.
-			if (blockDef.growthCycle) {
+			const cropProtection = getCropProtectionConfig(config);
+			if (
+				blockDef.growthCycle
+				&& blockDef.skill === "farming"
+				&& isInCropProtectionScopeAreas(dimensionId, blockPos, Array.isArray(config?.areas) ? config.areas : [], cropProtection)
+			) {
 				const farmlandPos = { x: blockPos.x, y: blockPos.y - 1, z: blockPos.z };
 				recordCropSnapshotAtSpot(dim, dimensionId, farmlandPos, block.typeId);
 			}

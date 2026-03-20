@@ -181,6 +181,11 @@ function validateCropProtectionConfig(cropProtection, label, warnings) {
 		warnings.push(`${label}: cropProtection debería ser un objeto`);
 		return;
 	}
+	const areaFilter = cropProtection.areaIds ?? cropProtection.areas;
+	if (areaFilter != null) {
+		const validType = typeof areaFilter === "string" || isStringArray(areaFilter);
+		if (!validType) warnings.push(`${label}: cropProtection.areaIds (o areas) debería ser string o string[]`);
+	}
 	if (cropProtection.intervalTicks != null) {
 		if (!isFiniteNumber(cropProtection.intervalTicks) || Number(cropProtection.intervalTicks) < 1) {
 			warnings.push(`${label}: cropProtection.intervalTicks debería ser >= 1`);

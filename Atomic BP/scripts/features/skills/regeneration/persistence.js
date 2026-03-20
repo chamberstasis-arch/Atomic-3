@@ -462,6 +462,11 @@ export function saveScopeGroups(context, scopeId, groups) {
 	if (!normalizedScopeId) return { ok: false, trimmed: 0 };
 	const dpKey = resolveScopeDpKey(context, normalizedScopeId);
 	const budget = trimGroupListForBudget(groups, context.persistence);
+	if (budget.trimmed > 0) {
+		// No escribimos payload recortado para evitar perder grupos pendientes en persistencia.
+		// El caller puede aplicar guardrails y reintentar con menos grupos.
+		return { ok: false, trimmed: Math.max(0, budget.trimmed) };
+	}
 
 	let ok = false;
 	if (dpKey === context.persistence.fallbackKey) {

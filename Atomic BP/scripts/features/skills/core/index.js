@@ -9,7 +9,7 @@ import {
 import { getRegisteredSkillDefinition, listRegisteredSkillDefinitions, setRegisteredSkillDefinition } from "./registry.js";
 
 let didInit = false;
-const activeRuntimeSkills = new Set();
+const skillRuntimeControllers = new Map();
 let activeConfig = skillsCoreConfig;
 
 function normalizeSkillId(skillId) {
@@ -31,15 +31,22 @@ function debugLog(message) {
 
 function ensureSkillRuntime(skillId) {
 	const id = normalizeSkillId(skillId);
-	if (!didInit || !id || activeRuntimeSkills.has(id)) return;
+	if (!didInit || !id) return;
 	const definition = getRegisteredSkillDefinition(id);
 	if (!definition) return;
+	const existing = skillRuntimeControllers.get(id);
+	if (existing && existing.ticks === definition.reconcileEveryTicks) return;
+	const token = Number(existing?.token || 0) + 1;
+	skillRuntimeControllers.set(id, { token, ticks: definition.reconcileEveryTicks });
 	system.runInterval(() => {
+		const controller = skillRuntimeControllers.get(id);
+		if (!controller || controller.token !== token) return;
+		const liveDefinition = getRegisteredSkillDefinition(id);
+		if (!liveDefinition) return;
 		for (const player of world.getAllPlayers()) {
-			reconcileSkillForDefinition(definition, player, "interval");
+			reconcileSkillForDefinition(liveDefinition, player, "interval");
 		}
 	}, definition.reconcileEveryTicks);
-	activeRuntimeSkills.add(id);
 	debugLog(`runtime active skill=${id} ticks=${definition.reconcileEveryTicks}`);
 }
 

@@ -110,7 +110,7 @@ Cuando `spread.sound.enabled=true`, cada bloque extra afectado reproduce su prop
 
 Esto hace que:
 
-- tala con varios logs suene más cargada,
+- tala con varios logs suene más cargada, 
 - minería con varios minerales pueda saturar `dig.stone`,
 - cosecha futura pueda hacer lo mismo con `dig.grass`.
 
@@ -154,12 +154,18 @@ Ejemplo (`content: ["+${xpGain} ${xpActual}/${xpRequeriment}"]`):
 - Fallback por comando para scoreboards valida objective token antes de ejecutar comando.
 - Escritura de scoreboards prioriza API (`world.scoreboard`) para evitar dependencia de permisos/cheats.
 - Lógica best-effort con `try/catch` en puntos de IO/runtime para no romper el servidor.
+- Recompensas atómicas por grupo: si un bloque no entra al grupo local de veta, no se otorgan drops/XP/scoreboard para ese evento.
+- Supresión de drops vanilla por trample endurecida: validación por dimensión, tipo de item, proximidad y ventana temporal corta; al suprimir, se consume la marca local.
+- Persistencia over-budget: no se guarda payload recortado de grupos; se aplican guardrails y reintento de persistencia para evitar pérdida silenciosa de pendientes.
+- `cropProtection` se limita a cultivos de `skill=farming` y puede restringirse por áreas (`areaIds`/`areas`) para evitar impacto global.
 
 ## Persistencia
 - La persistencia principal opera por **grupos locales de veta** (scope `dimension+area+skill+family`) en `dynamic properties` shardizadas por scope.
 - Cada grupo mantiene `status` (`open|closed|restoring`), `closeAt`, `restoreAt` y `members`.
 - Al boot/worldLoad se restauran pendientes de forma inmediata para limpiar estado offline.
 - Existe migración legacy de entries por bloque (`key` histórico) para compatibilidad de mundos antiguos.
+- Si un shard supera presupuesto (`maxStringLength` / `maxEntries`), el runtime evita persistir JSON recortado y prioriza reducir carga por guardrails antes de reintentar.
+- Si una escritura de scope falla, se programa reintento diferido sin romper el runtime en memoria.
 
 ## Estado de documentación
 Este archivo es la fuente vigente del módulo `regeneration`.

@@ -158,6 +158,7 @@ Ejemplo (`content: ["+${xpGain} ${xpActual}/${xpRequeriment}"]`):
 - Supresión de drops vanilla por trample endurecida: validación por dimensión, tipo de item, proximidad y ventana temporal corta; al suprimir, se consume la marca local.
 - Persistencia over-budget: no se guarda payload recortado de grupos; se aplican guardrails y reintento de persistencia para evitar pérdida silenciosa de pendientes.
 - `cropProtection` se limita a cultivos de `skill=farming` y puede restringirse por áreas (`areaIds`/`areas`) para evitar impacto global.
+- `cropProtectionLastFootByPlayer` se limpia en el handler `playerLeave` para evitar leak de memoria cuando un jugador se desconecta.
 
 ## Persistencia
 - La persistencia principal opera por **grupos locales de veta** (scope `dimension+area+skill+family`) en `dynamic properties` shardizadas por scope.

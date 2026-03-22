@@ -320,3 +320,9 @@ flowchart TD
 ## 12. Siguiente paso recomendado
 
 Formalizar `farming/` sobre el mismo contrato y decidir si la siguiente iteracion del core debe volver bidireccional la reconciliacion de rewards secundarias o mantener la politica incremental actual como decision de gameplay permanente.
+
+---
+
+## 13. Seguridad y hardening
+
+- **isValid guard en reconciliación**: `reconcileSkillForDefinition()` retorna `false` inmediatamente si `player.isValid === false`, evitando acceso a propiedades de entidades desconectadas.

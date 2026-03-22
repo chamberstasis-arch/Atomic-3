@@ -15,7 +15,9 @@ import {
 	setScore,
 	hasHEnabled,
 } from "../scoreboard.js";
-import { applyDefenseMultiplier, clampMin0, floorInt } from "../math.js";
+import { clampMin0, floorInt } from "../math.js";
+import { computeDefenseMitigation } from "../../calc/defense/index.js";
+import { defenseCalcConfig } from "../../calc/defense/config.js";
 
 export function initByMobDamageDealt(world, config = undefined) {
 	world.afterEvents.entityHitEntity.subscribe((ev) => {
@@ -56,9 +58,8 @@ export function initByMobDamageDealt(world, config = undefined) {
 				defSrc = "DtotalH";
 				defPlayer = getScore(target, OBJ_DEF_TOTAL, 0);
 			}
-			const danoRealFloat = applyDefenseMultiplier(dmgMob, defPlayer);
-			let danoReal = floorInt(danoRealFloat);
-			danoReal = clampMin0(danoReal);
+			// Mobs no tienen penetración por defecto; extender con score propio si se necesita.
+			const danoReal = computeDefenseMitigation(defenseCalcConfig, dmgMob, defPlayer, 0);
 			if (danoReal <= 0) return;
 
 			const vidaMax = getScore(target, OBJ_VIDA_MAX, undefined);

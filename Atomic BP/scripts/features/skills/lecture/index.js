@@ -164,18 +164,24 @@ function tickLecture(cfg) {
 		/** @type {Record<string, number>} */
 		const total = {};
 		for (const stat of STAT_REGISTRY) {
-			total[stat.id] = Math.trunc(Number(personal[stat.id] ?? 0) + Number(equipTotals[stat.id] ?? 0) + Number(otros[stat.id] ?? 0));
+			const sum = Number(personal[stat.id] ?? 0) + Number(equipTotals[stat.id] ?? 0) + Number(otros[stat.id] ?? 0);
+			total[stat.id] = Number.isFinite(sum) ? Math.trunc(sum) : 0;
 		}
 
-		// Skip si nada cambió
-		const canSkip =
-			prev &&
-			prev.enabled === true &&
-			prev.signature === signature &&
-			JSON.stringify(prev.personal) === JSON.stringify(personal) &&
-			JSON.stringify(prev.otros) === JSON.stringify(otros) &&
-			JSON.stringify(prev.equip) === JSON.stringify(equipTotals) &&
-			JSON.stringify(prev.total) === JSON.stringify(total);
+		// Skip si nada cambió (comparación por valor, NaN-safe)
+		let canSkip = prev && prev.enabled === true && prev.signature === signature;
+		if (canSkip) {
+			for (const stat of STAT_REGISTRY) {
+				const sid = stat.id;
+				if ((prev.personal[sid] ?? 0) !== (personal[sid] ?? 0) ||
+					(prev.otros[sid] ?? 0) !== (otros[sid] ?? 0) ||
+					(prev.equip[sid] ?? 0) !== (equipTotals[sid] ?? 0) ||
+					(prev.total[sid] ?? 0) !== (total[sid] ?? 0)) {
+					canSkip = false;
+					break;
+				}
+			}
+		}
 		if (canSkip) continue;
 
 		writeLayerIfChanged("equipamiento", player, identity, equipTotals, prev?.equip);
@@ -201,7 +207,10 @@ function tickLecture(cfg) {
 
 	// Limpieza cache
 	for (const key of cacheByPlayerKey.keys()) {
-		if (!active.has(key)) cacheByPlayerKey.delete(key);
+		if (!active.has(key)) {
+			cacheByPlayerKey.delete(key);
+			lastDebugMsByPlayerKey.delete(key);
+		}
 	}
 }
 

@@ -16,6 +16,11 @@ Módulo central del sistema de combate custom. Agrupa toda la lógica relacionad
 skills/
   combat/
     README.md                 ← Este documento (master)
+    config.js                 ← Config skill combat (niveles, XP por mob, loot)
+    index.js                  ← Registro en skills/core + init de XP/Loot
+    match.js                  ← Matching de mobs por typeId/nameTag/mainhandName
+    xp.js                     ← XP por kill (usa ExpCombateTotalH desde lecture)
+    loot.js                   ← Drops custom + política de supresión vanilla
     calc/                      ← Fórmula de daño final + mitigación defensiva
       README.md
       config.js
@@ -467,15 +472,20 @@ Esto reemplaza gradualmente los scoreboards base legacy (`DMGH`, `CDH`, `CCH`, `
 
 ### 9.4 Estado de integración con `skills/core`
 
-`combat/` todavía no está integrado al sistema de progresión por niveles de `skills/core/`.
+`combat/` ya está integrado al sistema de progresión por niveles de `skills/core/` con `skillId="combat"`.
 
 Estado actual:
-- `combat/` consume principalmente scoreboards producidos por `lecture/` y `calc/`.
-- Los niveles de skills no-combate (`mining`, `foraging`, `farming`) viven en `core/` y no gobiernan aún curvas de combate.
+- `combat/index.js` registra la skill en core (`registerSkillDefinition("combat", ...)`).
+- `combat/xp.js` consume kills player->mob desde `damage_dealt/byplayer` y suma XP en `SkillXpCombate`.
+- `lecture/` provee `ExpCombateTotalH` para bonus de XP por lore/equipamiento.
+- `combat/loot.js` aplica drops custom y política estricta de vanilla drops según killer/H/whitelist.
 
-Dirección recomendada para siguiente fase:
-- Definir un `skillId` de combate o sub-skills de combate en `core/`.
-- Delegar progresión/recompensas de combate al `core` (sin mover fórmulas de daño fuera de `combat/calc`).
+Reglas operativas de drops vanilla:
+- Asesino player con `H==1`: suppress vanilla por defecto.
+- Muerte natural/sin asesino player válido: suppress vanilla por defecto.
+- Asesino player con `H==0`: vanilla permitido por defecto.
+- `allowVanilla` por entrada de `mobLoot` habilita excepción explícita.
+- Armadura/equipo vanilla del mob se suprime por defecto salvo `allowArmorVanilla` explícito.
 
 ---
 

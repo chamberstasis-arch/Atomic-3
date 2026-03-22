@@ -23,6 +23,7 @@ export const OBJ_PROB_CRIT_TOTAL = "ProbCritTotalH";
 
 export const OBJ_DEF_TOTAL = "DtotalH";
 export const OBJ_DEF_TOTAL_TOTAL = "DefensaTotalH";
+export const OBJ_PEN_ARMOR_TOTAL = "PenArmorTotalH";
 export const OBJ_DMGH = "DMGH";
 
 export const OBJ_LAST_KILLER_ID = "LastKillerId";

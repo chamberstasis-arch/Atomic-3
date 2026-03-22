@@ -1,5 +1,6 @@
 import { anticheatConfig } from "../features/anticheat/anticheat.config.js";
 import { damageCalcConfig } from "../features/skills/combat/calc/config.js";
+import { combatSkillConfig } from "../features/skills/combat/config.js";
 import { STAT_REGISTRY } from "../features/skills/lecture/statRegistry.js";
 import { foragingSkillConfig } from "../features/skills/foraging/config.js";
 import { farmingSkillConfig } from "../features/skills/farming/config.js";
@@ -295,6 +296,7 @@ export function buildScoreboardCatalog() {
 	addSkillProgressionObjectives(list, seen, miningSkillConfig);
 	addSkillProgressionObjectives(list, seen, foragingSkillConfig);
 	addSkillProgressionObjectives(list, seen, farmingSkillConfig);
+	addSkillProgressionObjectives(list, seen, combatSkillConfig);
 
 	// --- Systems / Titles Priority (configurable) ---
 	addTitlesPriorityObjectives(list, seen, titlesPriorityConfig);

@@ -4,60 +4,112 @@
 
 Ruta: `Atomic BP/scripts/features/skills/combat/calc/defense`
 
-Este módulo define la capa de **mitigación de daño** del pipeline de combate.
+Este módulo implementa la capa de **mitigación de daño por defensa** del pipeline de combate.
 
-## Objetivo
+## Estado
 
-Separar la responsabilidad de mitigación para que `calc/` quede dividido en:
+**Activo** — la lógica de mitigación vive en `index.js` como funciones puras. `damage_dealt/byplayer` y `damage_dealt/by_mob` consumen directamente `computeDefenseMitigation()`.
 
-- cálculo base/final de daño,
-- mitigación defensiva,
-- outputs finales para consumidores.
+## Archivos
 
-La mitigación de defensa deja de ser una utilidad dispersa y pasa a un contrato explícito bajo `calc/defense`.
+| Archivo | Responsabilidad |
+|---------|----------------|
+| `config.js` | Constantes de fórmula, scores referenciados, modifiers extensibles |
+| `index.js` | Funciones puras de mitigación (`computeDefenseMitigation`, `applyDefenseMultiplier`) |
 
-## Contrato funcional (objetivo)
+## Contrato funcional
 
-Entradas mínimas:
-- `danoBase` (sin mitigar)
-- `defensaObjetivo`
-- contexto opcional para mitigaciones adicionales
+### `computeDefenseMitigation(cfg, danoBase, defensa, armorPenetrationPct)` → `number`
+
+Entradas:
+- `cfg` — configuración (`defenseCalcConfig` o override)
+- `danoBase` — daño antes de mitigación (entero positivo)
+- `defensa` — defensa total del objetivo (`DefensaTotalH` / `DtotalH`)
+- `armorPenetrationPct` — penetración de armadura del atacante (0–100, `PenArmorTotalH`)
 
 Salida:
 - `danoMitigado` entero (`>= 0`)
 
-Regla base de defensa (actual):
+### `applyDefenseMultiplier(danoBase, defensa)` → `number`
+
+Wrapper de compatibilidad — misma firma que la función original en `damage_dealt/math.js`.
+Internamente llama `computeDefenseMitigation(defenseCalcConfig, danoBase, defensa, 0)`.
+
+## Fórmula completa
+
+### Penetración de armadura
 
 $$
-danoMitigado = \left\lfloor danoBase \times \frac{75}{defensa + 75} \right\rfloor
+defEfectiva = defensa \times \left(1 - \frac{\text{clamp}(pen, 0, 100)}{100}\right)
 $$
 
-## Alcance actual vs siguiente fase
+### Ratio de mitigación
 
-Estado actual del runtime:
-- La mitigación efectiva hoy está aplicada en `combat/damage_dealt/math.js`.
+$$
+ratio = \frac{baseConstant}{defEfectiva + baseConstant}
+$$
 
-Dirección aprobada:
-- Migrar esa lógica al contrato de `calc/defense` para que `damage_dealt` solo consuma un resultado mitigado y no duplique reglas.
+Donde `baseConstant` = 75 por defecto (configurable en `config.js`).
 
-## Responsabilidades de `calc/defense`
+### Cap de reducción máxima
 
-- Resolver mitigación por defensa base.
-- Preparar extensión para mitigaciones futuras (resistencias por tipo, caps, inmunidades parciales).
-- Mantener comportamiento determinista e idempotente.
-- No crear objectives; solo consumir scoreboards ya catalogados.
+$$
+ratio = \max\left(ratio,\ 1 - \frac{maxReductionPercent}{100}\right)
+$$
 
-## Integración prevista
+Con `maxReductionPercent` = 90 por defecto → defensa nunca reduce más del 90%.
 
-- `calc/index.js`: compone daño base y delega mitigación a `calc/defense`.
-- `damage_dealt`: aplica daño ya mitigado y se enfoca en eventos/cooldowns/hook visual.
+### Resultado final
+
+$$
+danoMitigado = \left\lfloor danoBase \times ratio \right\rfloor,\quad \geq 0
+$$
+
+## Scoreboards referenciados
+
+| Score | Dirección | Descripción |
+|-------|-----------|-------------|
+| `DefensaTotalH` | input | Defensa total del objetivo (producido por `lecture/`) |
+| `DtotalH` | input (legacy) | Fallback de defensa total |
+| `PenArmorTotalH` | input | Penetración de armadura del atacante (0–100%) |
+
+> `PenArmorTotalH` sigue convención de `lecture/` (`*TotalH`). Se registrará en `statRegistry` cuando `lecture/` le dé soporte.
+
+## Configuración (`config.js`)
+
+```js
+defenseCalcConfig = {
+  formula: {
+    baseConstant: 75,          // constante de la curva
+    maxReductionPercent: 90,   // cap de reducción (1–100)
+  },
+  scores: {
+    defenseTotal: "DefensaTotalH",
+    defenseTotalLegacy: "DtotalH",
+    armorPenetration: "PenArmorTotalH",
+  },
+  modifiers: [],               // extensible para mitigaciones futuras
+}
+```
+
+### Cómo agregar nuevos modifiers
+
+1. Definir el score en `scores` (convención `*TotalH`)
+2. Añadir entrada en `modifiers[]` con `{ type: "flat"|"percent", source: "ScoreName", value: 0 }`
+3. El consumidor lee el score y lo pasa como argumento adicional
+
+## Integración con effects/ (futuro)
+
+`effects/` puede consumir `computeDefenseMitigation()` opcionalmente para aplicar mitigación a daño por efectos. Actualmente los efectos calculan daño como `% de VidaMax` y **no pasan por defensa**. La activación requiere:
+
+1. Agregar flag `applyDefense: true` en la config del efecto
+2. En `effects/tick.js`, importar y llamar `computeDefenseMitigation()` antes de aplicar el daño
+3. Decidir si penetración del efecto es fija (config) o variable (score)
 
 ## Reglas de diseño
 
-- Mantener funciones puras (sin side-effects de scoreboards).
-- Clampear valores para evitar `NaN`, `Infinity` y negativos fuera de rango.
-- Evitar acoplar mitigación a una sola fuente de defensa (`DefensaTotalH` vs `DtotalH`): la resolución de input debe quedar en capa de lectura, no en la fórmula.
-
-## Nota
-
-Este README define el contrato y la dirección de arquitectura. La migración de código puede ejecutarse en una fase posterior, manteniendo compatibilidad temporal con la implementación actual en `damage_dealt`.
+- Funciones puras: sin side-effects de scoreboards ni dimensión.
+- Determinista e idempotente: mismos inputs → mismo output.
+- No crear objectives; solo referenciar scoreboards catalogados.
+- Clampear para evitar `NaN`, `Infinity` y negativos.
+- Resolución de input (fallback `DefensaTotalH` → `DtotalH`) queda en el consumidor, no en la fórmula.

@@ -472,6 +472,7 @@ export function getSkillNextXpRequirementForDefinition(definition, currentLevel 
 
 export function reconcileSkillForDefinition(definition, player, source = "manual") {
 	if (!definition?.enabled || !player?.scoreboardIdentity) return false;
+	if (player.isValid === false) return false;
 	if (!Array.isArray(definition.levels) || definition.levels.length === 0) return false;
 	if (!hasSkillGateEnabled(player)) return false;
 

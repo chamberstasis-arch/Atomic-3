@@ -176,6 +176,15 @@ export const STAT_REGISTRY = [
 		total: "ExpCosTotalH",
 	},
 	{
+		id: "ExpCombate",
+		label: "Experiencia de Combate:",
+		type: "int",
+		personal: "ExpCombatePersonalH",
+		equipamiento: "ExpCombateEquipamientoH",
+		otros: "ExpCombateOtrosH",
+		total: "ExpCombateTotalH",
+	},
+	{
 		id: "MA",
 		label: "Multiplicador Aditivo:",
 		type: "float",

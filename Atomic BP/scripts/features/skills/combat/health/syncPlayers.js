@@ -36,8 +36,9 @@ function getPlayerKey(player) {
 function clampVida(vida, vidaMax) {
 	const v = Math.trunc(Number(vida));
 	if (!Number.isFinite(v)) return 0;
-	if (vidaMax <= 0) return v;
-	return Math.max(0, Math.min(vidaMax, v));
+	const vm = Number(vidaMax);
+	if (!Number.isFinite(vm) || vm <= 0) return v;
+	return Math.max(0, Math.min(vm, v));
 }
 
 function ensurePlayerVidaInitialized(player, config) {

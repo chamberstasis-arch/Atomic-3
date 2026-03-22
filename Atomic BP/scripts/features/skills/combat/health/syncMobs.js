@@ -93,7 +93,7 @@ export function syncMobs(world, config = undefined) {
 		// 1) Refrescar/integrar mobs del set tracked
 		for (const entity of trackedMobs) {
 			try {
-				if (!entity || entity.typeId === "minecraft:player") {
+				if (!entity || !entity.isValid || entity.typeId === "minecraft:player") {
 					trackedMobs.delete(entity);
 					continue;
 				}

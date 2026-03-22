@@ -1959,8 +1959,15 @@ export function initMiningRegen(userConfig) {
 	}
 
 	try {
-		world?.afterEvents?.playerLeave?.subscribe?.(() => {
-			system.run(() => maybeRestoreAllIfNoPlayers("allPlayersLeft"));
+		world?.afterEvents?.playerLeave?.subscribe?.((ev) => {
+			system.run(() => {
+				maybeRestoreAllIfNoPlayers("allPlayersLeft");
+				// Limpiar datos de crop protection del jugador saliente.
+				try {
+					const pid = String(ev?.playerId ?? "").trim();
+					if (pid) cropProtectionLastFootByPlayer.delete(pid);
+				} catch (e) { void e; }
+			});
 		});
 	} catch (e) {
 		void e;

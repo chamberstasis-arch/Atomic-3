@@ -7,6 +7,7 @@ import {
 	OBJ_DEF_TOTAL_TOTAL,
 	OBJ_LAST_KILLER_ID,
 	OBJ_LAST_KILL_TICK,
+	OBJ_PEN_ARMOR_TOTAL,
 	OBJ_PROB_CRIT,
 	OBJ_PROB_CRIT_TOTAL,
 	OBJ_VIDA,
@@ -20,7 +21,30 @@ import {
 	removeScoreMin0,
 	setScore,
 } from "../scoreboard.js";
-import { applyDefenseMultiplier, clampMin0, floorInt, rollCrit } from "../math.js";
+import { clampMin0, floorInt, rollCrit } from "../math.js";
+import { computeDefenseMitigation } from "../../calc/defense/index.js";
+import { defenseCalcConfig } from "../../calc/defense/config.js";
+
+/** @type {Set<(attacker:any, target:any)=>void>} */
+const mobKilledByPlayerListeners = new Set();
+
+export function subscribeOnMobKilledByPlayer(listener) {
+	if (typeof listener !== "function") return () => {};
+	mobKilledByPlayerListeners.add(listener);
+	return () => {
+		mobKilledByPlayerListeners.delete(listener);
+	};
+}
+
+function emitMobKilledByPlayer(attacker, target) {
+	for (const listener of mobKilledByPlayerListeners) {
+		try {
+			listener(attacker, target);
+		} catch (e) {
+			void e;
+		}
+	}
+}
 
 function setKilledByTagBestEffort(target, attacker) {
 	try {
@@ -84,9 +108,8 @@ export function initByPlayerDamageDealt(world, config = undefined) {
 				defensaSrc = "DtotalH";
 				defensa = getScore(target, OBJ_DEF_TOTAL, 0);
 			}
-			const danoRealFloat = applyDefenseMultiplier(danoBase, defensa);
-			let danoReal = floorInt(danoRealFloat);
-			danoReal = clampMin0(danoReal);
+			const penArmor = getScore(attacker, OBJ_PEN_ARMOR_TOTAL, 0);
+			const danoReal = computeDefenseMitigation(defenseCalcConfig, danoBase, defensa, penArmor);
 			if (danoReal <= 0) return;
 
 			// Si VidaMax==0 => inmortal logica (compat con combat/health)
@@ -128,6 +151,7 @@ export function initByPlayerDamageDealt(world, config = undefined) {
 					} catch (e) {
 						void e;
 					}
+					emitMobKilledByPlayer(attacker, target);
 					killEntityBestEffort(target);
 				}
 			}
@@ -136,7 +160,7 @@ export function initByPlayerDamageDealt(world, config = undefined) {
 				debugTellBestEffort(
 					attacker,
 					`[DamageDealtDbg] ${source} crit=${isCrit} probCrit=${probCrit}(${probCritSrc}) ` +
-						`danoSC=${danoSC} danoCC=${danoCC} danoBase=${danoBase} def=${defensa}(${defensaSrc}) danoReal=${danoReal}`
+						`danoSC=${danoSC} danoCC=${danoCC} danoBase=${danoBase} def=${defensa}(${defensaSrc}) pen=${penArmor} danoReal=${danoReal}`
 				);
 			}
 		} catch (e) {

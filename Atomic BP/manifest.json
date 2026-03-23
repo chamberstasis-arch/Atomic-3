@@ -5,7 +5,7 @@
     "name": "Atomic3 Functions",
     "uuid": "21bf0072-c1c9-4d89-a9c2-2665016f86be",
     "version": [1, 0, 1],
-    "min_engine_version": [1, 21, 93]
+    "min_engine_version": [1, 21, 130]
   },
   "metadata": {
     "authors": [

@@ -1,5 +1,6 @@
-import { addScore, debugTellBestEffort, getScore, hasHEnabled, isPlayerEntity } from "./damage_dealt/scoreboard.js";
+import { addScore, debugTellBestEffort, ensureObjectiveBestEffort, getScore, hasHEnabled, isPlayerEntity } from "./damage_dealt/scoreboard.js";
 import { subscribeOnMobKilledByPlayer } from "./damage_dealt/byplayer/index.js";
+import { onSkillScoreboardsApplied as onCoreSkillScoreboardsApplied } from "../core/index.js";
 import { combatSkillConfig } from "./config.js";
 import { resolveMobMatch, snapshotEntityForMatch } from "./match.js";
 
@@ -28,9 +29,8 @@ function notifyDebug(cfg, player, text) {
 	debugTellBestEffort(player, `[CombatXP] ${String(text)}`);
 }
 
-function computeXpFinal(cfg, attacker, baseXp) {
+function computeXpFinal(cfg, attacker, baseXp, loreObjective) {
 	const xpCfg = cfg?.xp && typeof cfg.xp === "object" ? cfg.xp : {};
-	const loreObjective = String(xpCfg?.loreBonusObjective || "ExpCombateTotalH");
 	const minBonus = Number.isFinite(Number(xpCfg?.minBonusPercent)) ? Number(xpCfg.minBonusPercent) : -100;
 	const maxBonus = Number.isFinite(Number(xpCfg?.maxBonusPercent)) ? Number(xpCfg.maxBonusPercent) : 10000;
 	const rawBonus = getScore(attacker, loreObjective, 0);
@@ -55,12 +55,27 @@ function onMobKilledByPlayer(cfg, attacker, target) {
 	const baseXp = Math.max(0, toInt(match?.baseXp, 0));
 	if (baseXp <= 0) return;
 
-	const xpFinal = computeXpFinal(cfg, attacker, baseXp);
+	const xpCfg = cfg?.xp && typeof cfg.xp === "object" ? cfg.xp : {};
+	const loreObjective = String(xpCfg?.loreBonusObjective || "ExpCombateTotalH").trim();
+	if (loreObjective && !ensureObjectiveBestEffort(loreObjective)) {
+		notifyDebug(cfg, attacker, `objective bonus no existe: ${loreObjective} (se usa bonus 0)`);
+	}
+
+	const xpFinal = computeXpFinal(cfg, attacker, baseXp, loreObjective || "ExpCombateTotalH");
 	if (xpFinal <= 0) return;
 
-	const xpObjective = String(cfg?.scoreboards?.xp || "SkillXpCombate");
+	const xpObjective = String(cfg?.scoreboards?.xp || "SkillXpCombate").trim();
+	if (!xpObjective) {
+		notifyDebug(cfg, attacker, "objective XP vacío en config");
+		return;
+	}
+	if (!ensureObjectiveBestEffort(xpObjective)) {
+		notifyDebug(cfg, attacker, `objective XP no existe: ${xpObjective}`);
+		return;
+	}
 	addScore(attacker, xpObjective, xpFinal);
-	notifyDebug(cfg, attacker, `+${xpFinal} XP (base=${baseXp})`);
+	onCoreSkillScoreboardsApplied("combat", attacker, { [xpObjective]: xpFinal });
+	notifyDebug(cfg, attacker, `+${xpFinal} XP (base=${baseXp}, obj=${xpObjective})`);
 }
 
 export function initCombatXp(userConfig = undefined) {

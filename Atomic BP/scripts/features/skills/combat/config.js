@@ -115,6 +115,15 @@ export const combatSkillConfig = {
 		initializeOnJoin: true,
 		notifyOnLevelDown: false,
 		preserveHigherPrimary: true,
+		titles: {
+			enabledByDefault: true,
+			source: "skill_xp",
+			id: "combat_xp",
+			priority: 40,
+			durationTicks: 40,
+			contentTemplate: ["+${xpGain} §8| §c${skill} §8| §7${xpActual}/${xpRequeriment}"],
+			noLevelsContentTemplate: ["+${xpGain} §8| §c${skill} §8| §7${xpTotal}"],
+		},
 	},
 
 	mobXp: [
@@ -128,8 +137,6 @@ export const combatSkillConfig = {
 	],
 
 	mobLoot: [
-		// allowVanilla habilita drops vanilla solo para esta entrada.
-		// allowArmorVanilla habilita drop de equipo/armadura vanilla para esta entrada.
 		{ typeId: "minecraft:zombie", drops: [{ itemId: "minecraft:rotten_flesh", chance: 1, min: 1, max: 2 }] },
 		{ typeId: "minecraft:skeleton", drops: [{ itemId: "minecraft:bone", chance: 1, min: 1, max: 3 }] },
 	],

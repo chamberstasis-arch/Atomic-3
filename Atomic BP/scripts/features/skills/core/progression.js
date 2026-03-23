@@ -1,4 +1,5 @@
 import { asStr, getScoreBestEffort, setScoreBestEffort, toInt } from "./scoreboards.js";
+import { upsertTemporaryTitle } from "../../../systems/titlesPriority/index.js";
 
 const DEFAULT_LEVEL_UP_SOUND = Object.freeze({ id: "random.levelup", volume: 1, pitch: 1 });
 const DEFAULT_LEVEL_UP_PARTICLE = Object.freeze({ id: "minecraft:totem_particle", count: 1, offset: { x: 0, y: 0, z: 0 } });
@@ -361,6 +362,84 @@ function sendMessageLines(player, lines) {
 	}
 }
 
+function asLines(value) {
+	if (Array.isArray(value)) return value.map((v) => String(v ?? ""));
+	if (value == null) return [];
+	return [String(value)];
+}
+
+function renderXpTitleTemplate(templateLines, payload) {
+	const lines = asLines(templateLines);
+	const data = payload && typeof payload === "object" ? payload : {};
+	return lines.map((line) => {
+		let out = String(line ?? "");
+		for (const [k, v] of Object.entries(data)) {
+			out = out.replaceAll("${" + String(k) + "}", String(v ?? ""));
+			out = out.replaceAll(`<${String(k)}>`, String(v ?? ""));
+		}
+		return out;
+	});
+}
+
+function getXpTitleRuntime(definition) {
+	const runtime = definition?.raw?.runtime;
+	if (!runtime || typeof runtime !== "object") return null;
+	const titles = runtime.titles;
+	if (!titles || typeof titles !== "object") return null;
+	if (titles.enabledByDefault === false) return null;
+	return titles;
+}
+
+function emitXpProgressTitleForDefinition(definition, player, xpGain) {
+	if (!definition?.enabled || !player?.scoreboardIdentity) return;
+	const titlesCfg = getXpTitleRuntime(definition);
+	if (!titlesCfg) return;
+
+	const gain = Math.max(0, toInt(xpGain, 0));
+	if (gain <= 0) return;
+
+	const currentXp = Math.max(0, toInt(getScoreBestEffort(player, definition.xpObjective), 0));
+	const currentLevel = Math.max(1, toInt(getScoreBestEffort(player, definition.levelObjective), 1));
+	const nextReq = getSkillNextXpRequirementForDefinition(definition, currentLevel);
+
+	const payload = {
+		xpGain: gain,
+		xpActual: currentXp,
+		xpTotal: currentXp,
+		xpRequirement: nextReq ?? "MAX",
+		xpRequeriment: nextReq ?? "MAX",
+		skill: definition.displayName,
+		level: toRoman(currentLevel),
+		levelArabic: currentLevel,
+	};
+
+	const contentTemplate = Array.isArray(titlesCfg.contentTemplate) && titlesCfg.contentTemplate.length > 0
+		? titlesCfg.contentTemplate
+		: ["+${xpGain}"];
+	const noLevelsTemplate = Array.isArray(titlesCfg.noLevelsContentTemplate) && titlesCfg.noLevelsContentTemplate.length > 0
+		? titlesCfg.noLevelsContentTemplate
+		: contentTemplate;
+	const template = nextReq == null ? noLevelsTemplate : contentTemplate;
+	const content = renderXpTitleTemplate(template, payload).filter((line) => String(line ?? "").trim().length > 0);
+	if (content.length === 0) return;
+
+	const source = asStr(titlesCfg.source) || `skill_xp_${definition.id}`;
+	const id = asStr(titlesCfg.id) || definition.id;
+	const priority = Number.isFinite(Number(titlesCfg.priority)) ? Number(titlesCfg.priority) : 40;
+	const durationTicks = Number.isFinite(Number(titlesCfg.durationTicks)) ? Number(titlesCfg.durationTicks) : 40;
+	const durationMs = Number.isFinite(Number(titlesCfg.durationMs)) ? Number(titlesCfg.durationMs) : undefined;
+
+	upsertTemporaryTitle({
+		target: player,
+		source,
+		id,
+		priority,
+		durationTicks,
+		durationMs,
+		content,
+	});
+}
+
 function isSafeCommandToken(token) {
 	return /^[0-9A-Za-z_:\.-]+$/.test(String(token != null ? token : ""));
 }
@@ -551,5 +630,7 @@ export function onSkillScoreboardsAppliedForDefinition(definition, player, addsM
 	if (!definition?.enabled || !addsMap || typeof addsMap !== "object") return false;
 	const delta = toInt(addsMap[definition.xpObjective], 0);
 	if (delta === 0) return false;
-	return reconcileSkillForDefinition(definition, player, "regen-xp");
+	const reconciled = reconcileSkillForDefinition(definition, player, "regen-xp");
+	emitXpProgressTitleForDefinition(definition, player, delta);
+	return reconciled;
 }

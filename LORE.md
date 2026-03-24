@@ -2,25 +2,273 @@ Si bien este es un plan de desarrollo cabe indagar un lore minimo para realizar 
 
 Contexto:
 
-Un jugador cae de otro mundo; En una grieta desde el cielo, en aquel mundo desconocido dislumbra un archipielago lleno de varias islas con construcciones y puentes, además un complejo sistema de montañas que tapa la luz del sol en algunos lugares, arriba de esas montañas también parece haber construcciones, mirando a todos lados no ve ni un solo ser vivo, un silencio sepulcral invade el ambiente
+Un jugador cayó de otro mundo.
 
-Y entonces una voz se escucha en el fondo susurrando "¿Qué eres?, ¿Quién eres?" tú, sin darle tanta importancia recoges un palo del suelo que parece ser un tanto especial, la voz se acerco y te hablo al oido "Caiste de esa grieta, no pareces ser de por aquí." tú no respondes, el silencio responde por tí, la voz parece entenderlo, "Bien entonces, supongo que el destino me trajo aquí para ser tu guia" sin hablar pareces comunicarle tus pensamientos o algo más, una conexión extraña, no sabias que era ese ser, cosa, que te hablaba, "¿Qué quien soy yo?, alguien que cayo en desgracia después de multiples tragedias, pero el destino me trajo para ser tu guia aparentemente"
-Dudando pareciste fingir hacerle caso a su explicación aunque un tanto sospechoso, te preguntabas que era concretamente, ya que no parecia tener una forma fisica "¿Que que soy?, soy un remanente por así decirlo, la condensación de un noble proposito" entonces mirando a tu mano y viendo el palo sostenido le preguntas por la historia de aquel mundo; "Hace  mucho tiempo... más de lo que podría vivir un mortal"
+La grieta se abrió en el cielo y lo dejó en una isla desconocida. Cuando se puso de pie, vio un archipiélago extendido frente a él. Había puentes entre las islas, construcciones de piedra y montañas tan altas que en algunas zonas tapaban la luz del sol. Sobre varias cimas también se veían edificios.
 
-Un inviduo creo a los mortales "A su imagen y semejanza", el ser lo conocemos como "El Avatar", su aspecto todo un misterio, caminaba entre los mortales, buscando rejocigo en cosas vanales, reir, hablar con ellos, pero eran tantos, eran miles, eran millones, que creo a sus 6 sombras; Seres quasi divinos capaces de gobernar en tronos celestiales.
+No había nadie.
 
-Los Siete fue un grupo de "deidades" que empezaron por el bien y terminaron por el mal, al principio no era más que una lijera ayuda, pero cuando la intervención fue más grande, metiendose en conflictos, en la guerra, en los recursos, el humano no lo pudo soportar, era demasiado, todas sus acciones parecian tener un fin divino, y si vives sin decidir, entonces no vives.
+Miró a un lado. Luego al otro. No encontró personas, animales ni señales de movimiento. El lugar estaba en silencio el viento lo sentía en la cara, el pasto se movia, las hojas de los arboles caian, el paisaje era esplendido, el jugador analizo la situación detenidamente, vio un objeto que le parecia interesante y cuando lo iba a agarrar...
 
-Se alzaron los humanos, el regalo del Avatar fue la "Magia" capacidad de trascender los limites mortales; 8 humanos excepcionalmente talentosos se levantaron contra lo divino, en silencio una rebelión se armo, hasta que llego el día y la tragedia consumio al mundo con la llegada del "Usurpador".
+Oyó una voz.
 
-Los Siete se fragmentaron tras la guerra, no muertos pero si vagando por el mundo, sin el poder que tenian en antaño pero aún vivos.
+—¿Qué eres? ¿Quién eres?
 
-"Y eso fue hace 500 años, de allá para aca... han pasado inumerables tragedias, el mundo se fue a gris, el humano dejo de prosperar y entonces llego al punto de extinción."
+El jugador no respondió. Bajó la mirada y recogió un palo del suelo. La madera era firme y tenía algo extraño, aunque no supo decir qué.
 
-"Por eso; podrías ser el único aquí, o simplemente el último."
+La voz volvió a hablar, esta vez más cerca.
 
-Sin inmutarte no le diste importancia y bajo la luz del sol empuñaste tu palo y golpeaste un arbol en busqueda de madera, extrajiste los minerales sin inmutarte por aquel sujeto ni por la historia de aquel mundo, con los materiales usando habilidades desconocidas creaste herramientas mejores y un barco con el cual te moviste hacia la siguiente isla
+—Caíste de esa grieta. No pareces de por aquí.
 
-"Cuentame ¿Cómo sabes hacer eso?, se nota que eres de otro mundo ¿verdad? aquí tenemos algo parecido llamado "permutación" que nos permite alterar la materia atraves de "energía pura" y transmutar un material a otro con ciertas restricciones... pero eso que tú haces es superior en todo aspecto"
+Él siguió callado.
 
-Llegaste a la isla y bastante más grande que la anterior tenía varias estructuras abandonadas pero no parecian desgastadas por el paso del tiempo, parecian extrañamente cuidadas y mantenidas, 
+—Está bien —dijo la voz—. Supongo que necesitaras ayuda aquí.
+
+El jugador giró la cabeza, buscando a quien hablaba. No vio nada por ningún lado, pero era extraño; tampoco parecia como si saliera de su cabeza, y sin importar a que dirección volteara la voz se escuchaba como si estuviera detras de él.
+
+—Sé lo que piensas —continuó la voz—. Quieres saber qué soy. Puedes llamarme un "remanente". Eso es lo más cercano a la verdad.
+
+El jugador apretó el palo. Seguía sin confiar, pero no parecía representar un peligro, le resultaba molesto pero de todas maneras continuo.
+
+—También quieres saber qué pasó en este mundo —dijo la voz—. Escucha.
+
+Él empezó a caminar mientras la voz hablaba.
+
+—Hace mucho tiempo, existian 7 sombras, entre ellas una brillaba con más intesidad que las otras...
+
+El jugador se acercó a un árbol y golpeó el tronco con el palo.
+
+—Al principio ayudaron. Después empezaron a decidir por todos. Se metieron en guerras, en ciudades, en recursos. Los humanos dejaron de vivir por cuenta propia, como si fueran ganado.
+
+Otro golpe. Luego otro, la madera empezaba a romperse en pedazos.
+
+—Entonces los mortales se alzaron. Ocho humanos se rebelaron contra lo divino. La guerra destruyó el mundo. Y con ella llegó el Usurpador que terminó con él.
+
+El árbol cayó y el jugador escuchaba lo que la voz decía más no perdía el tiempo.
+
+El jugador reunió madera, en rocas cercanas piedra y de las plantas extrajo fibra. Trabajó sin pausa. Sus manos se movían con la agilidad de un experto.
+
+—Los Siete no murieron —dijo la voz—. Te contaré un secreto... siguen vivos, 500 años han pasado; tragedia e inmundicia invadio al mundo.
+
+Con los materiales que reunió, el jugador fabricó mejores herramientas y armó una embarcación simple.
+
+—Puede que seas el único aquí —dijo la voz—
+
+Él subió al bote y avanzó hacia la siguiente isla, con remos improvisados remo con fuerza a la isla más cercana donde discernia estructuras y un gran terreno a simple vista, no tardo mucho en llegar.
+
+La nueva isla era más grande. Tenía edificios abandonados, caminos de piedra y muros cubiertos por plantas. Aun así, nada parecía viejo del todo. El sitio estaba demasiado intacto.
+
+El jugador se asento momentaneamente allí y recolecto un par de materiales más, usandolos creó un hacha, una espada y un pico. Luego siguió explorando en busca de más materiales.
+
+Encontró pollos, cerdos y ovejas. Tomó de ellos lo que necesitaba. Más adelante halló una cantera abierta y dentro de ella extrajo piedra y carbón. Con eso fabricó flechas y un arco.
+
+—Tal vez debas revisar las cuevas —dijo la voz.
+
+El jugador se detuvo.
+
+—En la isla del este hay un cráter. Debajo se abre una mina.
+
+Fue hasta allí sin perder tiempo. Cruzó el agua, avanzó entre árboles y encontró la entrada. Bajó.
+
+Dentro de la cueva sacó más carbón, más piedra y luego hierro. Encendió fuego, trabajó el metal y armó un escudo reforzado con madera.
+
+—¿Qué buscas exactamente? —preguntó la voz.
+
+Él no respondió.
+
+Una flecha salió de la oscuridad.
+
+El escudo subió a tiempo y el golpe sonó seco en la cueva. El jugador giró hacia el origen del ataque. Un esqueleto tensaba un arco entre las sombras.
+
+Disparó otra vez.
+
+El jugador avanzó.
+
+La segunda flecha pasó cerca de su hombro. La tercera fue directa al cuello. Él levantó la espada y la partió en el aire.
+
+Ya estaba cerca.
+
+El primer corte le arrancó al esqueleto el brazo con el arco. El segundo le cortó el otro. El último abrió el torso y esparció huesos por el suelo.
+
+El ruido se extendió por la cueva.
+
+—Entiendo... —dijo la voz
+
+—Pareces familiarizado con la muerte y la guerra. Dime, ser sin nombre, ¿buscas poder?
+
+El jugador no respondió.
+
+Se agachó y recogió varios huesos del suelo. Algunos aún conservaban puntas de flecha clavadas entre las costillas. Podían servirle. Cuando se incorporó, otra flecha cruzó la cueva y pasó junto a su cara.
+
+Giró hacia la oscuridad.
+
+Dos puntos rojos brillaban al fondo. Luego aparecieron más. Uno a la izquierda. Otro detrás de una columna de piedra. Luego tres juntos, quietos, esperando. No tardó en entenderlo: no era un arquero. Era un grupo entero.
+
+—Ya veo —dijo la voz, más baja esta vez—. Este lugar sigue ocupado.
+
+La primera descarga llegó de frente.
+
+El jugador se movió apenas lo justo. Una flecha golpeó el escudo. Otra pasó por su costado. La tercera se clavó en la pared. Dio un paso al frente, luego otro, y cuando la siguiente lluvia de proyectiles salió desde la oscuridad ya estaba corriendo.
+
+Vio al primer esqueleto al alcance de la espada. Cortó en diagonal y el cuerpo se abrió por el torso. Antes de que los huesos tocaran el suelo, lo empujó hacia un lado y lo usó para cubrirse de dos disparos más. Avanzó entre el ruido seco de las flechas contra la roca.
+
+A su derecha, un arquero intentó retroceder.
+
+Le disparó al cráneo con el arco que había fabricado
+El esqueleto cayó al suelo y el sonido de los huesos rebotó por toda la cueva.
+
+El jugador esperó unos segundos antes de moverse. Escuchó. No venían más pasos. No oyó cuerdas tensarse ni piedras rodando en la oscuridad. Entonces se agachó y recogió varios huesos del suelo. Los revisó uno por uno, apartó los quebrados y guardó los más firmes.
+
+Con piedra, carbón y mineral de hierro armó un horno pequeño junto a la pared. Encendió fuego, dejó la comida sobre una plancha improvisada y puso el hierro a fundir. Mientras esperaba, afiló uno de los huesos con paciencia. Lo raspó con una piedra lisa, corrigió la punta con la espada y reforzó la base con un mango corto de madera. Cuando terminó, tenía una daga ligera y dura, basta para pelear en espacios cerrados.
+
+Recogió la comida cocida, cambió su viejo pico por uno de hierro y armó otro escudo. El anterior ya estaba hundido por los golpes y las flechas.
+
+La voz regresó cuando el fuego empezó a apagarse.
+
+—Eres hábil. Eso ya quedó claro.
+
+El jugador levantó la vista, atento por primera vez.
+
+—Puedo darte algo mejor que una explicación —continuó la voz—. Una tarea.
+
+Él no habló, pero se quedó quieto.
+
+—En este mundo aún quedan cosas peores que estas cuevas. Seres que siguen aplastando lo poco que queda de la gente. Si nos ayudas a acabar con ellos, nosotros también podremos ayudarte.
+
+El jugador sostuvo la daga nueva, probó el equilibrio en la mano y esperó.
+
+La voz pareció entender esa espera.
+
+—Todavía te falta camino. Baja más. Aprende cómo respira este lugar. Si no puedes con la oscuridad de aquí abajo, no podrás con nada de lo que viene.
+
+El jugador guardó sus herramientas, fabricó una antorcha y siguió adelante.
+
+La entrada de la cueva era áspera y angosta, pero más adentro el lugar cambiaba. Había grietas por donde entraba luz desde la superficie. El agua corría entre piedras cubiertas de musgo. En algunas paredes crecían plantas bajas y gruesas. Más al fondo, entre raíces colgantes, se veían frutas pequeñas con una luz tenue, casi azul.
+
+El jugador avanzó despacio. Miraba el suelo antes de cada paso, luego el techo, luego las salidas laterales. No parecía impresionado. Solo medía el espacio.
+
+Encontró más hierro, algo de carbón y bastante piedra. También vio vetas de oro, escasas y dispersas. Las dejó donde estaban. No le servían todavía. Arrancó algunas plantas de la pared y tomó dos de aquellas frutas brillantes.
+
+—Son comestibles —dijo la voz—, pero quítales la semilla primero.
+
+Él abrió una con la daga. La pulpa era blanda. La semilla, negra y dura. La sacó, olió la fruta un momento y le dio un mordisco.
+
+Esperó.
+
+No pasó nada.
+
+Comió la segunda mitad.
+
+La voz dejó escapar una risa baja.
+
+—No dudas mucho. Eso puede ayudarte... o meterte en problemas.
+
+El jugador siguió bajando.
+
+A cada tramo la luz natural perdía fuerza. Las paredes se estrechaban y el aire se volvía más frío. El agua ya no corría con la misma claridad. Se oían goteos aislados, y de vez en cuando el ruido de algo pequeño moviéndose entre grietas.
+
+Al llegar a una cámara más amplia vio otra veta de oro en la pared. Levantó el pico, listo para trabajar, cuando escuchó pasos detrás de él.
+
+Giró.
+
+Un hombre estaba de pie a pocos metros. Llevaba ropa rota, el rostro sucio y los hombros caídos. Respiraba rápido, como si acabara de correr una gran distancia.
+
+El jugador no bajó el arma.
+
+—No te dejes engañar —dijo la voz de inmediato—. Eso no es un humano.
+
+El jugador tomo su daga y se paro frente a frente de aquel ser
+
+El ser agresivamente atacó al jugador
+
+En solo unos segundos la criatura fue apuñalada en el torso, piernas, cuello, cara y cayo al suelo
+Desplomado el jugador no vio utilidad en los materiales dejados por la creatura
+El jugador parecio extrañado; Creyo que habia acabado con la criatura
+
+La criatura parecio cerrar las heridas y volvio a arremeter
+El jugador ahora más serio al respecto se puso en guardia y cuando la creatura estuvo en su rango dio un poderoso tajo que rebano la cabeza de la criatura.
+
+Cayo al suelo muerto, parecia ser algo parecido a un zombie o no-muerto
+
+-Ya esta muerto, estas criaturas son capaces de hacer muchas cosas, aunque es facil acabar con ellas.
+
+El jugador limpio su daga y camino siguiendo su rumbo
+
+-Eres íncreiblemente insensible, he conocido humanos y monstruos, todos temblarian un poco si fuera su primera vez acabando con seres vivos y más con uno de su especie; aunque no fuera el caso, eres particularmente extraño.
+
+El jugador no respondió. Limpió la daga, revisó el filo y siguió su camino.
+La cueva se abrió más adelante en una sala amplia, casi como una cámara oculta. A primera vista parecía un refugio levantado por alguien que había pasado por allí y había decidido quedarse. Había telas rojas colgadas entre columnas de piedra, velas encendidas en soportes de hierro y muebles improvisados con una atención extraña al detalle. Algunos paños tenían bordados dorados.
+
+El jugador se detuvo en la entrada y observó.
+
+No vio movimiento.
+
+Avanzó.
+
+Apenas cruzó el primer tramo de tela, algo brilló a su izquierda.
+
+Le dio tiempo justo para levantar la daga.
+
+El choque le sacudió el brazo.
+
+Una espada había bajado directo a su cuello. La bloqueó por reflejo y dio medio paso atrás. Frente a él apareció el atacante: un esqueleto vestido con harapos rojos, rematados con bordados de hilo dorado. Llevaba un parche sobre una cuenca vacía y sujetaba la espada con una mano firme. El arma tenía una guarda sencilla, pero el mango era dorado y estaba bien cuidado.
+
+No parecía un enemigo cualquiera.
+
+—Detrás de ti —advirtió la voz.
+
+El jugador giró de inmediato.
+
+Una flecha venía de frente. Alcanzó a desviar el tiro con la daga, pero en ese mismo instante sintió un corte en la espalda. El esqueleto ya se había movido. La espada le había abierto un corte limpio de hombro a costado.
+
+Fue la primera herida real desde que cayó en ese mundo.
+
+El jugador tensó la mandíbula y se apartó antes de que el siguiente corte le alcanzara el pecho.
+
+Los sonidos del metal chocando contra la daga de hueso resonsaban y flechas se disparaban de todas las direcciones, el asentamiento estaba lleno de trampas, ninguna flecha impactaba al esqueleto
+
+El jugador en un segundo tomo distancia y saco su arco
+
+Aprovechó una mesa baja como cobertura, disparó de inmediato.
+
+La primera flecha fue al pecho.
+
+El esqueleto inclinó el torso y la dejó pasar.
+
+La segunda buscó la pierna adelantada.
+
+La esquivó con un paso corto.
+
+La tercera fue a la cabeza.
+
+La apartó con la espada
+
+El esqueleto ya estaba encima.
+
+Cuando el hierro choco con el daga de hueso, el hueso cedío, la daga se rompio en pedazos
+
+El jugador sin dudar un segundo tomo los pedazos y agarro con fuerza la espada del esqueleto
+
+El esqueleto que tenia su arma agarrada con su otra mano saco una daga con la que ataco al jugador pero el jugador no le importo, a pesar de que el esqueleto le clavo la daga en el costado
+
+Apretó más fuerte la espada, giró el cuerpo y tiró hacia un lado. El metal crujió. La presión cambió de golpe. Con un esfuerzo brutal, dobló la hoja y la quebró cerca de la mitad.
+
+el esqueleto impresionado por tal azaña retrocedio
+
+el jugador desclavo la daga que tenia en el costado para empuñarla como arma
+
+-tú... eres fuerte, muy fuerte, el último que llego aquí lo hice pedazos, pero tu eres digno de unirtenos decia el esqueleto
+
+El jugador se quedo quieto esperando cualquier ataque
+
+-el esqueleto no esta solo, retirate cuanto antes. decia la voz
+
+-Te ofrezco algo, unetenos, trabaja para nosotros y saldrás vivo de aquí.
+
+El jugador parecio dudar un momento pero bajo su arma
+
+El esqueleto también bajo su arma
+
+-Que sujeto tan interesante eres, seguramente te preguntarás como un esqueleto puede hablar, ¿verdad?.. decia el esqueleto
+
+-Como sea no tiene importancia, ¿Que quienes somos?, nos conocen de aquí a allá desde hace más de un siglo, llamados "La Compañía del Segador"

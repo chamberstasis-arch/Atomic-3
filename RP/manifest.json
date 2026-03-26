@@ -17,7 +17,7 @@
 	"dependencies": [
 		{
 			"uuid": "21bf0072-c1c9-4d89-a9c2-2665016f86be",
-			"version": [ 1, 0, 0 ]
+			"version": [ 1, 0, 1 ]
 		}
 	]
 }

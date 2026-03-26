@@ -91,5 +91,14 @@ export const farmingSkillConfig = {
 		initializeOnJoin: true,
 		notifyOnLevelDown: false,
 		preserveHigherFortune: true,
+		titles: {
+			enabledByDefault: true,
+			source: "skill_xp",
+			id: "farming_xp",
+			priority: 40,
+			durationTicks: 40,
+			contentTemplate: ["+${xpGain} §8| §e${skill} §8| §7${xpActual}/${xpRequeriment}"],
+			noLevelsContentTemplate: ["+${xpGain} §8| §e${skill} §8| §7${xpTotal}"],
+		},
 	},
 };

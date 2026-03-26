@@ -8,21 +8,30 @@ import { world } from "@minecraft/server";
 // - Si el objective no existe o identity no está listo, tratar como 0.
 
 const OBJ_H = "H";
+const OBJ_VIDA = "Vida";
 
-/** @type {import('@minecraft/server').ScoreboardObjective | null} */
-let cachedObjectiveH = null;
-
-function getObjectiveHBestEffort() {
+function getObjectiveBestEffort(name, cache) {
 	try {
-		if (cachedObjectiveH) return cachedObjectiveH;
+		if (cache.obj) return cache.obj;
 		const sb = world?.scoreboard;
 		if (!sb) return null;
-		cachedObjectiveH = sb.getObjective(OBJ_H) || null;
-		return cachedObjectiveH;
+		cache.obj = sb.getObjective(name) || null;
+		return cache.obj;
 	} catch (e) {
 		void e;
 		return null;
 	}
+}
+
+const _cacheH = { obj: null };
+const _cacheVida = { obj: null };
+
+function getObjectiveHBestEffort() {
+	return getObjectiveBestEffort(OBJ_H, _cacheH);
+}
+
+function getObjectiveVidaBestEffort() {
+	return getObjectiveBestEffort(OBJ_VIDA, _cacheVida);
 }
 
 export function getHScoreBestEffort(player) {
@@ -41,4 +50,18 @@ export function getHScoreBestEffort(player) {
 
 export function isHEnabled(player) {
 	return getHScoreBestEffort(player) === 1;
+}
+
+export function getVidaScoreBestEffort(player) {
+	try {
+		const obj = getObjectiveVidaBestEffort();
+		if (!obj) return undefined;
+		const id = player?.scoreboardIdentity;
+		if (!id) return undefined;
+		const v = obj.getScore(id);
+		return v === undefined || v === null ? undefined : Number(v);
+	} catch (e) {
+		void e;
+		return undefined;
+	}
 }

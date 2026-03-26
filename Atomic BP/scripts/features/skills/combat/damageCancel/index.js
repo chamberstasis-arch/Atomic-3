@@ -1,10 +1,12 @@
 import { system, world } from "@minecraft/server";
-import { isHEnabled } from "./score.js";
+import { isHEnabled, getVidaScoreBestEffort } from "./score.js";
 
 // Feature: skills/combat/damageCancel
 //
 // Objetivo:
-// - Evitar que el jugador pierda HP vanilla al recibir daño si su scoreboard `H` es 1.
+// - Evitar que el jugador muera por daño vanilla si su scoreboard `H` es 1.
+// - Permitir que daño NO-LETAL pase para que el knockback vanilla ocurra naturalmente.
+// - health/syncPlayers se encarga de restaurar HP vanilla al ratio Vida/VidaMax cada tick de sync.
 //
 // Restricciones:
 // - NO Dynamic Properties
@@ -12,8 +14,8 @@ import { isHEnabled } from "./score.js";
 // - NO overrides JSON de `minecraft:player` (player.json), porque rompe el actor y el gameplay.
 //
 // Implementación:
-// - Preferido: cancelar el evento en `world.beforeEvents.entityHurt`.
-// - Fallback: restaurar HP en `world.afterEvents.entityHurt`.
+// - Preferido: cancelar el evento en `world.beforeEvents.entityHurt` SOLO si sería letal.
+// - Fallback: restaurar HP en `world.afterEvents.entityHurt` si se escapó un letal.
 // - Tag opcional `hp_mode` solo para debug (no cancela nada por sí solo).
 
 const DEFAULT_LOOP_TICKS = 10;
@@ -128,7 +130,9 @@ export function initVanillaDamageCancel(options = undefined) {
 		}
 	}, loopTicks);
 
-	// Preferido: cancelar el daño antes de aplicarse.
+	// Preferido: cancelar el daño antes de aplicarse SOLO si sería letal.
+	// Daño no-letal pasa → el motor aplica knockback vanilla naturalmente.
+	// health/syncPlayers restaurará HP vanilla al ratio Vida/VidaMax en el siguiente tick de sync.
 	try {
 		const be = world.beforeEvents;
 		if (be?.entityHurt && typeof be.entityHurt.subscribe === "function") {
@@ -137,13 +141,34 @@ export function initVanillaDamageCancel(options = undefined) {
 					const ent = ev?.hurtEntity;
 					if (!ent || ent.typeId !== "minecraft:player") return;
 					const player = ent;
-					// Usar cache si existe (para no leer scoreboard en cada hurt), si no leer directo.
 					const key = getPlayerKey(player);
 					const enabled = key ? (lastEnabledByPlayerKey.get(key) ?? isHEnabled(player)) : isHEnabled(player);
 					if (!enabled) return;
-					ev.cancel = true;
+
+					// Leer HP vanilla actual y daño entrante.
+					const hc = player.getComponent?.("minecraft:health");
+					if (!hc) { ev.cancel = true; return; }
+					const curHp = Number(hc.currentValue);
+					const dmg = Number(ev.damage);
+					if (!Number.isFinite(curHp) || !Number.isFinite(dmg)) { ev.cancel = true; return; }
+
+					// Consultar Vida del sistema custom para decisión informada.
+					const vida = getVidaScoreBestEffort(player);
+
+					// Si el sistema custom dice que Vida <= 0, el jugador debe morir.
+					// No cancelar para que la muerte vanilla proceda normalmente.
+					if (vida !== undefined && vida <= 0) return;
+
+					// Solo cancelar si el daño mataría al jugador vanilla (letal).
+					// Si es no-letal, dejar pasar para preservar knockback.
+					if (dmg >= curHp) {
+						ev.cancel = true;
+					}
+					// else: no cancelar → knockback ocurre, HP vanilla baja temporalmente,
+					// health/syncPlayers lo corrige en ~200ms.
 				} catch (e) {
-					void e;
+					// En caso de error, cancelar por seguridad para no matar al jugador.
+					try { ev.cancel = true; } catch (_) { void _; }
 				}
 			});
 		}
@@ -151,7 +176,8 @@ export function initVanillaDamageCancel(options = undefined) {
 		void e;
 	}
 
-	// Fallback: restaurar HP tras daño aplicado.
+	// Fallback: restaurar HP tras daño aplicado SOLO si fue letal (el cancel no alcanzó).
+	// Para daño no-letal que pasó intencionalmente, NO restaurar (health/ lo hará en el sync).
 	try {
 		const ae = world.afterEvents;
 		if (ae?.entityHurt && typeof ae.entityHurt.subscribe === "function") {
@@ -163,6 +189,13 @@ export function initVanillaDamageCancel(options = undefined) {
 					const key = getPlayerKey(player);
 					const enabled = key ? (lastEnabledByPlayerKey.get(key) ?? isHEnabled(player)) : isHEnabled(player);
 					if (!enabled) return;
+
+					// Solo heal-back si el HP actual llegó a 0 o menos (muerte inminente).
+					const hc = player.getComponent?.("minecraft:health");
+					if (!hc) return;
+					const cur = Number(hc.currentValue);
+					if (!Number.isFinite(cur) || cur > 0) return;
+					// HP vanilla llegó a 0 — restaurar para evitar muerte vanilla.
 					tryHealBackDamage(player, ev.damage);
 				} catch (e) {
 					void e;

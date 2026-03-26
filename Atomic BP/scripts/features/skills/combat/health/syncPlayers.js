@@ -529,6 +529,8 @@ export function syncPlayers(world, config = undefined) {
 					}
 				}
 				// delta negativo se ignora: NO bajar Vida.
+				// Diseño: Vida solo se reduce por damage_dealt (fuente única). El daño vanilla
+				// no-letal pasa para knockback; health/ corrige HP vanilla al ratio en el step 2).
 			}
 
 			// 2) Sincronizar scoreboard -> corazones vanilla SIEMPRE.

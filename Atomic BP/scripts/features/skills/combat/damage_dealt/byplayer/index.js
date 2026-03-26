@@ -110,7 +110,7 @@ export function initByPlayerDamageDealt(world, config = undefined) {
 			}
 			const penArmor = getScore(attacker, OBJ_PEN_ARMOR_TOTAL, 0);
 			const danoReal = computeDefenseMitigation(defenseCalcConfig, danoBase, defensa, penArmor);
-			if (danoReal <= 0) return;
+			if (!Number.isFinite(danoReal) || danoReal <= 0) return;
 
 			// Si VidaMax==0 => inmortal logica (compat con combat/health)
 			const vidaMax = getScore(target, OBJ_VIDA_MAX, undefined);

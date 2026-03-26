@@ -1,7 +1,6 @@
 // Persistencia de regeneración por grupos locales de veta (world dynamic properties).
 // Responsabilidad: normalizar/guardar/cargar estado persistente de grupos y migrar pending legacy.
 
-import * as mc from "@minecraft/server";
 import { system, world } from "@minecraft/server";
 
 function safeJsonParse(str) {
@@ -506,43 +505,10 @@ export function clearLegacyPendingEntries(config) {
 }
 
 export function initMiningRegenDynamicProperties(config) {
-	const persistence = getPersistenceConfig(config);
-	const scopeMap = buildScopeShardMap(config, persistence);
-	const keys = new Set([
-		persistence.legacyKey,
-		persistence.indexKey,
-		persistence.fallbackKey,
-		...scopeMap.values(),
-	]);
-
-	try {
-		const initEv = world?.afterEvents?.worldInitialize?.subscribe
-			? world.afterEvents.worldInitialize
-			: world?.beforeEvents?.worldInitialize?.subscribe
-				? world.beforeEvents.worldInitialize
-				: null;
-
-		if (initEv && typeof initEv.subscribe === "function") {
-			initEv.subscribe((ev) => {
-				try {
-					if (!ev || !ev.propertyRegistry) return;
-					const DefCtor = mc && mc.DynamicPropertiesDefinition ? mc.DynamicPropertiesDefinition : null;
-					if (!DefCtor) return;
-					const def = new DefCtor();
-					if (typeof def.defineString === "function") {
-						for (const key of keys) def.defineString(key, persistence.maxLen);
-					} else if (typeof def.defineNumber === "function") {
-						def.defineNumber(persistence.indexKey, 0, 1);
-					}
-					ev.propertyRegistry.registerWorldDynamicProperties(def);
-				} catch (e) {
-					void e;
-				}
-			});
-		}
-	} catch (e) {
-		void e;
-	}
+	// @minecraft/server 2.x: Dynamic Properties son schemaless, no requieren registro.
+	// worldInitialize y DynamicPropertiesDefinition fueron removidos de la superficie estable 2.0.0+.
+	// world.setDynamicProperty() funciona directamente sin registro previo.
+	void config;
 }
 
 export function initSkillRegenDynamicProperties(config) {

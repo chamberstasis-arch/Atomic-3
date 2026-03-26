@@ -253,22 +253,47 @@ El esqueleto que tenia su arma agarrada con su otra mano saco una daga con la qu
 
 Apretó más fuerte la espada, giró el cuerpo y tiró hacia un lado. El metal crujió. La presión cambió de golpe. Con un esfuerzo brutal, dobló la hoja y la quebró cerca de la mitad.
 
-el esqueleto impresionado por tal azaña retrocedio
+El jugador soltó los restos de la espada. Bajó la vista al arma clavada en su costado, la arrancó de un tirón y la sostuvo en la mano como si ahora le perteneciera.
 
-el jugador desclavo la daga que tenia en el costado para empuñarla como arma
+La sangre empezó a correrle por la ropa.
 
--tú... eres fuerte, muy fuerte, el último que llego aquí lo hice pedazos, pero tu eres digno de unirtenos decia el esqueleto
+El esqueleto mantuvo la distancia. La cuenca vacía bajo el parche seguía fija en él. La otra, encendida con una luz roja apagada, parecía medirlo.
+
+—Tú... eres fuerte —dijo al fin—. Mucho más de lo que esperaba. El último que llegó hasta aquí duró poco. A ti te ofrecieron una tumba y respondiste rompiéndome la espada.
 
 El jugador se quedo quieto esperando cualquier ataque
 
--el esqueleto no esta solo, retirate cuanto antes. decia la voz
+-El esqueleto no esta solo, retirate cuanto antes. decia la voz
 
--Te ofrezco algo, unetenos, trabaja para nosotros y saldrás vivo de aquí.
+—Te haré una oferta —continuó el esqueleto—. Baja el arma. Si no te interesa mi arma puede hablar por mí.
 
-El jugador parecio dudar un momento pero bajo su arma
+El jugador sostuvo la mirada del esqueleto unos segundos más.
 
-El esqueleto también bajo su arma
+Luego bajó la daga, sin guardarla del todo.
 
--Que sujeto tan interesante eres, seguramente te preguntarás como un esqueleto puede hablar, ¿verdad?.. decia el esqueleto
+El esqueleto hizo lo mismo. Dejó caer el brazo armado y dio medio paso atrás.
 
--Como sea no tiene importancia, ¿Que quienes somos?, nos conocen de aquí a allá desde hace más de un siglo, llamados "La Compañía del Segador"
+—Qué sujeto tan interesante. Seguro te preguntas cómo puede hablar un esqueleto.
+
+No esperó respuesta.
+
+—La pregunta importa poco. Hay cosas peores que morir. Cosas peores que quedar reducido a hueso. 
+
+El jugador levantó un poco la daga.
+
+El esqueleto alzó la mano vacía otra vez.
+
+—Calma. Solo escucha.
+
+Caminó despacio hacia una tela roja colgada del fondo y la apartó. Detrás había un emblema bordado en oro: una hoz curva sobre un círculo abierto, cosido sobre tela oscura y remendado muchas veces.
+
+—Nos conocen desde hace más de un siglo —dijo—. En puertos hundidos, minas rotas, ruinas tomadas por raíces y caminos donde ya no manda ningún rey y por todo el mundo. Algunos nos llaman bandidos. Otros mercenarios. Otros carroñeros.
+
+Volvió la cabeza hacia él.
+
+—Nuestro nombre es La Compañía del Segador.
+
+El silencio de la sala se sintío aún más.
+
+El jugador observó el emblema, luego las telas, luego las velas distribuidas con demasiada precisión para ser decoración, ese lugar se trataba de un puesto de avanzada.
+

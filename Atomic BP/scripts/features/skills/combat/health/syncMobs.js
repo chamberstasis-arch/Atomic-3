@@ -88,6 +88,49 @@ export function considerTrackMob(entity, config = undefined) {
 	}
 }
 
+function readMobHealthComponent(entity) {
+	try {
+		const hc = entity?.getComponent?.("minecraft:health");
+		if (!hc) return null;
+		const cur = Number(hc.currentValue);
+		const max = Number(hc.effectiveMax);
+		if (!Number.isFinite(cur) || !Number.isFinite(max) || max <= 0) return null;
+		return { hc, cur, max };
+	} catch (e) {
+		void e;
+		return null;
+	}
+}
+
+function computeMobTargetVanillaHealth(vida, vidaMax, vanillaMax) {
+	if (vidaMax <= 0) return vanillaMax; // inmortal lógica => full
+	const v = Number(vida);
+	const vm = Number(vidaMax);
+	const mx = Number(vanillaMax);
+	if (!Number.isFinite(v) || !Number.isFinite(vm) || !Number.isFinite(mx) || vm <= 0 || mx <= 0) return 0;
+	const ratio = Math.max(0, Math.min(1, v / vm));
+	let target = Math.round(ratio * mx);
+	if (!Number.isFinite(target)) target = 0;
+	target = Math.max(0, Math.min(mx, target));
+	// Si Vida>0 pero el redondeo da 0, mantener al menos 1 para evitar muerte vanilla prematura.
+	if (v > 0 && target <= 0) target = Math.max(1, Math.min(2, Math.trunc(mx)));
+	return target;
+}
+
+function applyMobVanillaHealthBestEffort(hc, target) {
+	try {
+		if (typeof hc.setCurrentValue === "function") {
+			hc.setCurrentValue(target);
+			return true;
+		}
+		hc.currentValue = target;
+		return true;
+	} catch (e) {
+		void e;
+		return false;
+	}
+}
+
 export function syncMobs(world, config = undefined) {
 	try {
 		// 1) Refrescar/integrar mobs del set tracked
@@ -108,6 +151,17 @@ export function syncMobs(world, config = undefined) {
 					if (Number(st.vida) <= 0) {
 						killEntityBestEffort(entity);
 						continue;
+					}
+				}
+
+				// Sincronizar Vida → HP vanilla para que la barra de salud del mob refleje
+				// el estado real de Vida. Esto también previene que daño vanilla mate al mob
+				// mientras Vida > 0.
+				const mh = readMobHealthComponent(entity);
+				if (mh && st.vidaMax > 0) {
+					const targetHp = computeMobTargetVanillaHealth(st.vida, st.vidaMax, mh.max);
+					if (Math.abs(mh.cur - targetHp) >= 0.0001) {
+						applyMobVanillaHealthBestEffort(mh.hc, targetHp);
 					}
 				}
 			} catch (e) {

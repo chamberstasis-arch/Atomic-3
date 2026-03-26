@@ -198,5 +198,14 @@ export const miningSkillConfig = {
 		initializeOnJoin: true,
 		notifyOnLevelDown: false,
 		preserveHigherFortune: true,
+		titles: {
+			enabledByDefault: true,
+			source: "skill_xp",
+			id: "mining_xp",
+			priority: 40,
+			durationTicks: 40,
+			contentTemplate: ["+${xpGain} §8| §b${skill} §8| §7${xpActual}/${xpRequeriment}"],
+			noLevelsContentTemplate: ["+${xpGain} §8| §b${skill} §8| §7${xpTotal}"],
+		},
 	},
 };

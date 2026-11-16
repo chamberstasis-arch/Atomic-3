@@ -41,8 +41,12 @@ function ensureAllOnce() {
 				void e;
 				try {
 					const dim = world.getDimension("minecraft:overworld");
-					if (dim && typeof dim.runCommandAsync === "function") {
-						dim.runCommandAsync(`scoreboard players set global ${totalObjectiveId} ${total}`);
+					if (dim) {
+						if (typeof dim.runCommand === "function") {
+							dim.runCommand(`scoreboard players set global ${totalObjectiveId} ${total}`);
+						} else if (typeof dim.runCommand === "function") {
+							dim.runCommand(`scoreboard players set global ${totalObjectiveId} ${total}`);
+						}
 					}
 				} catch (e2) {
 					void e2;

@@ -14,7 +14,7 @@ Este documento describe la entidad del **Behavior Pack** `atomic:hologram`.
 
 ## Archivo
 
-- [../entities/hologram.json](../entities/hologram.json): define la entidad `atomic:hologram`.
+- [../../entities/hologram.json](../../entities/hologram.json): define la entidad `atomic:hologram`.
 
 ## Uso previsto (Script API)
 

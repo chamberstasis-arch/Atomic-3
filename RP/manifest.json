@@ -1,8 +1,8 @@
 {
 	"format_version": 2,
 	"header": {
-		"name": "Modificacion",
-		"description": "Chest UI",
+		"name": "Atomic RP",
+		"description": "Atomic Resource Pack",
 		"uuid": "aef8207d-0922-4a65-acca-208ec3dd4642",
 		"version": [ 1, 5, 0 ],
 		"min_engine_version": [ 1, 21, 0 ]
@@ -17,7 +17,7 @@
 	"dependencies": [
 		{
 			"uuid": "21bf0072-c1c9-4d89-a9c2-2665016f86be",
-			"version": [ 1, 0, 0 ]
+			"version": [ 1, 0, 1 ]
 		}
 	]
 }

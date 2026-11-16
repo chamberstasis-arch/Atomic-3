@@ -23,22 +23,3 @@ export function rollCrit(probPercent) {
 	// 0..99
 	return Math.floor(Math.random() * 100) < p;
 }
-
-export function applyDefenseMultiplier(danoBase, defensa) {
-	const base = Number(danoBase);
-	if (!Number.isFinite(base) || base <= 0) return 0;
-
-	let def = Number(defensa);
-	if (!Number.isFinite(def)) def = 0;
-	if (def <= 0) return base;
-
-	// Reduccion monotona (0..1):
-	// mult = 75 / (def + 75)
-	// - def=0 => 1.0
-	// - def=75 => 0.5
-	// - def grande => tiende a 0
-	const mult = 75 / (def + 75);
-	if (!Number.isFinite(mult)) return 0;
-
-	return base * mult;
-}

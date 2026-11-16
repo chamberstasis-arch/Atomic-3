@@ -6,13 +6,12 @@
 // 3) Memoria runtime (último recurso)
 
 import { system, world } from "@minecraft/server";
-import * as mc from "@minecraft/server";
 
 import { runInOverworld, quoteForCommand } from "./commandsRunner.js";
 import { getObjectiveFromConfig, getObjectiveNameFromConfig } from "./scoreboardStore.js";
 
-const AC_ENABLED_KEY = "atomic3:ac_enabled";
-const BAN_KICK_ENABLED_KEY = "atomic3:ac_ban_kick_enabled";
+const AC_ENABLED_KEY = "atomic:ac_enabled";
+const BAN_KICK_ENABLED_KEY = "atomic:ac_ban_kick_enabled";
 
 const SB_AC_ENABLED = "ac_enabled";
 const SB_BAN_KICK_ENABLED = "ac_ban_kick_enabled";
@@ -49,34 +48,9 @@ try {
 export function initFeatureFlagsDynamicProperties() {
 	if (didRegisterDynamicProps) return;
 	didRegisterDynamicProps = true;
-	// Registrar las dynamic properties (necesario para que set/getDynamicProperty funcionen sin throw).
-	// Esto es crítico para Realms donde los comandos/scoreboards pueden estar limitados si cheats=OFF.
-	try {
-		if (world && world.afterEvents && world.afterEvents.worldInitialize && typeof world.afterEvents.worldInitialize.subscribe === "function") {
-			world.afterEvents.worldInitialize.subscribe((ev) => {
-				try {
-					if (!ev || !ev.propertyRegistry) return;
-					const DefCtor = mc && mc.DynamicPropertiesDefinition ? mc.DynamicPropertiesDefinition : null;
-					if (!DefCtor) return;
-					const def = new DefCtor();
-					// Booleans simples
-					if (typeof def.defineBoolean === "function") {
-						def.defineBoolean(AC_ENABLED_KEY);
-						def.defineBoolean(BAN_KICK_ENABLED_KEY);
-					} else if (typeof def.defineNumber === "function") {
-						// Fallback: 0/1
-						def.defineNumber(AC_ENABLED_KEY, 0, 1);
-						def.defineNumber(BAN_KICK_ENABLED_KEY, 0, 1);
-					}
-					ev.propertyRegistry.registerWorldDynamicProperties(def);
-				} catch (e) {
-					void e;
-				}
-			});
-		}
-	} catch (e) {
-		void e;
-	}
+	// @minecraft/server 2.x: Dynamic Properties son schemaless, no requieren registro.
+	// worldInitialize y DynamicPropertiesDefinition fueron removidos de la superficie estable 2.0.0+.
+	// world.setDynamicProperty() funciona directamente sin registro previo.
 }
 
 function q(value) {
@@ -120,7 +94,7 @@ function scheduleWorldLoadRetry(options) {
 	try {
 		if (world && world.afterEvents && world.afterEvents.worldLoad && typeof world.afterEvents.worldLoad.subscribe === "function") {
 			world.afterEvents.worldLoad.subscribe(() => {
-				// Orden: scoreboardsInit crea objectives en worldLoad; nosotros reintentamos en el siguiente tick.
+				// Orden: scripts/scoreboards/init.js crea objectives en worldLoad; nosotros reintentamos en el siguiente tick.
 				try {
 					system.run(() => {
 						try {

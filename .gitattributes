@@ -1,0 +1,17 @@
+# Normaliza fines de línea: el repo guarda LF; Windows/Linux checkout se resuelve solo.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ttf binary
+*.otf binary
+*.fsb binary
+*.ogg binary
+*.mcpack binary
+*.mcaddon binary
+*.zip binary
+
+# Scripts de Windows: mantener CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf

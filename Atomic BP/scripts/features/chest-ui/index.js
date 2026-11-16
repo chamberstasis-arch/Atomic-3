@@ -1,9 +1,8 @@
 import { world } from "@minecraft/server";
 import ChestFormData from "./chestui/forms.js";
-import { primaryBankMenu } from "./bank/bankMenu.js";
 import { upgradesPrimaryMenu } from "./upgrades/upgradesMenu.js";
 
-export { ChestFormData, primaryBankMenu, upgradesPrimaryMenu };
+export { ChestFormData, upgradesPrimaryMenu };
 
 // Exporta una función de inicialización
 export function initChestUi() {

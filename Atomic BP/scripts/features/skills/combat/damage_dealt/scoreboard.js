@@ -23,6 +23,7 @@ export const OBJ_PROB_CRIT_TOTAL = "ProbCritTotalH";
 
 export const OBJ_DEF_TOTAL = "DtotalH";
 export const OBJ_DEF_TOTAL_TOTAL = "DefensaTotalH";
+export const OBJ_PEN_ARMOR_TOTAL = "PenArmorTotalH";
 export const OBJ_DMGH = "DMGH";
 
 export const OBJ_LAST_KILLER_ID = "LastKillerId";
@@ -80,7 +81,7 @@ export function killEntityBestEffort(entity) {
 		void e;
 	}
 	try {
-		entity?.runCommandAsync?.("kill @s");
+		entity?.runCommand?.("kill @s");
 		return true;
 	} catch (e) {
 		void e;
@@ -163,7 +164,7 @@ export function debugTellBestEffort(entity, message) {
 		void e;
 	}
 	try {
-		entity?.runCommandAsync?.(`tellraw @s {"rawtext":[{"text":${JSON.stringify(text)}}]}`);
+		entity?.runCommand?.(`tellraw @s {"rawtext":[{"text":${JSON.stringify(text)}}]}`);
 		return true;
 	} catch (e) {
 		void e;

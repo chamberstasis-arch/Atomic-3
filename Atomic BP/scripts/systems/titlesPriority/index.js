@@ -261,9 +261,9 @@ function pickBestTitle(cfg, titles, player) {
 
 async function sendActionbarTitleraw(player, rawtext) {
 	try {
-		if (!player?.runCommandAsync) return false;
+		if (!player?.runCommand) return false;
 		const payload = JSON.stringify({ rawtext });
-		await player.runCommandAsync(`titleraw @s actionbar ${payload}`);
+		player.runCommand(`titleraw @s actionbar ${payload}`);
 		return true;
 	} catch (e) {
 		void e;
@@ -529,7 +529,7 @@ async function tickTitlesPriority(cfg) {
 	const staticTitles = normalizeTitles(cfg);
 	const nowMs = Date.now();
 
-	const players = world.getAllPlayers();
+	const players = world.getPlayers();
 	for (const player of players) {
 		const temporaryTitles = getTemporaryTitlesForPlayer(player, nowMs);
 		const candidates = staticTitles.length > 0 ? [...staticTitles, ...temporaryTitles] : temporaryTitles;

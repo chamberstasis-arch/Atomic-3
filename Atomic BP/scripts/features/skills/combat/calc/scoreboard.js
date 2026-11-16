@@ -18,10 +18,20 @@ export function quoteForCommand(value) {
 	return `"${safeString(value).replace(/"/g, "\\\"")}"`;
 }
 
+/** @type {Map<string, any>} */
+const objectiveCache = new Map();
+
 export function getObjectiveBestEffort(objectiveId) {
+	const id = safeString(objectiveId);
+	if (objectiveCache.has(id)) {
+		const cached = objectiveCache.get(id);
+		if (cached) return cached;
+	}
 	try {
 		if (!world || !world.scoreboard || typeof world.scoreboard.getObjective !== "function") return null;
-		return world.scoreboard.getObjective(safeString(objectiveId)) || null;
+		const obj = world.scoreboard.getObjective(id) || null;
+		if (obj) objectiveCache.set(id, obj);
+		return obj;
 	} catch (e) {
 		void e;
 		return null;
@@ -113,11 +123,11 @@ export function setScoreIdentityBestEffort(dimension, objectiveId, identity, pla
 
 	// 2) Fallback comando
 	try {
-		if (!dimension || typeof dimension.runCommandAsync !== "function") return false;
+		if (!dimension || typeof dimension.runCommand !== "function") return false;
 		if (!playerName) return false;
 		const selector = `@a[name=${quoteForCommand(playerName)}]`;
 		const cmd = `execute as ${selector} run scoreboard players set @s ${safeString(objectiveId)} ${Math.trunc(v)}`;
-		void dimension.runCommandAsync(cmd).catch(() => {});
+		dimension.runCommand(cmd);
 		return true;
 	} catch (e) {
 		void e;

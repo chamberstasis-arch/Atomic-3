@@ -1,6 +1,10 @@
 import { anticheatConfig } from "../features/anticheat/anticheat.config.js";
 import { damageCalcConfig } from "../features/skills/combat/calc/config.js";
+import { combatSkillConfig } from "../features/skills/combat/config.js";
 import { STAT_REGISTRY } from "../features/skills/lecture/statRegistry.js";
+import { foragingSkillConfig } from "../features/skills/foraging/config.js";
+import { farmingSkillConfig } from "../features/skills/farming/config.js";
+import { miningSkillConfig } from "../features/skills/mining/config.js";
 import { skillRegenConfig } from "../features/skills/regeneration/config.js";
 import achievementsConfig from "../features/achievements/config.js";
 import titlesPriorityConfig from "../systems/titlesPriority/config.js";
@@ -36,12 +40,67 @@ function addRegenObjectives(list, seen, config) {
 	for (const block of blocks) {
 		addObjectivesFromMap(list, seen, block?.scoreboardAddsOnBreak);
 
-		const modifiers = block?.modifiers && typeof block.modifiers === "object" ? block.modifiers : null;
-		if (!modifiers) continue;
-		for (const mod of Object.values(modifiers)) {
-			addObjectivesFromMap(list, seen, mod?.scoreboardAddsOnBreak);
+		const modifiers = block?.modifiers;
+		if (!modifiers) {
+			// noop: no modifiers to scan
+		} else if (Array.isArray(modifiers)) {
+			for (const rule of modifiers) {
+				if (!rule || typeof rule !== "object") continue;
+				const effects = rule?.effects && typeof rule.effects === "object" ? rule.effects : rule;
+				addObjectivesFromMap(list, seen, effects?.scoreboardAddsOnBreak);
+
+				const xp = effects?.xp && typeof effects.xp === "object" ? effects.xp : null;
+				const gainObjective = xp ? safeString(xp.gainObjective) : "";
+				if (gainObjective) addObjective(list, seen, gainObjective, gainObjective);
+			}
+		} else if (typeof modifiers === "object") {
+			for (const mod of Object.values(modifiers)) {
+				addObjectivesFromMap(list, seen, mod?.scoreboardAddsOnBreak);
+			}
+		}
+
+		// XP block-level (independiente de fortuna)
+		const blockXp = block?.xp && typeof block.xp === "object" ? block.xp : null;
+		if (blockXp) {
+			const go = safeString(blockXp.gainObjective);
+			if (go) addObjective(list, seen, go, go);
+		}
+
+		const spread = block?.spread && typeof block.spread === "object" ? block.spread : null;
+		const spreadObjective = safeString(spread?.objective);
+		if (spreadObjective) addObjective(list, seen, spreadObjective, spreadObjective);
+
+		const mutation = block?.mutation && typeof block.mutation === "object" ? block.mutation : null;
+		const mutationObjective = safeString(mutation?.objective);
+		if (mutationObjective) addObjective(list, seen, mutationObjective, mutationObjective);
+
+		// Fortune tiers: escanear tiers para scoreboards (solo scoreboardAddsOnBreak)
+		const ft = block?.fortuneTiers;
+		if (ft && typeof ft === "object") {
+			const tiers = Array.isArray(ft.tiers) ? ft.tiers : [];
+			for (const tier of tiers) {
+				if (!tier || typeof tier !== "object") continue;
+				const te = tier.effects && typeof tier.effects === "object" ? tier.effects : null;
+				if (!te) continue;
+				addObjectivesFromMap(list, seen, te.scoreboardAddsOnBreak);
+			}
 		}
 	}
+
+	const bySkill = config?.runtime?.titles?.progressObjectivesBySkill;
+	if (bySkill && typeof bySkill === "object") {
+		for (const def of Object.values(bySkill)) {
+			if (!def || typeof def !== "object") continue;
+			const xpObjective = safeString(def.xp);
+			const lvlObjective = safeString(def.level);
+			if (xpObjective) addObjective(list, seen, xpObjective, xpObjective);
+			if (lvlObjective) addObjective(list, seen, lvlObjective, lvlObjective);
+		}
+	}
+
+	const spreadDefaults = config?.runtime?.spread;
+	const spreadDefaultObjective = safeString(spreadDefaults?.objective);
+	if (spreadDefaultObjective) addObjective(list, seen, spreadDefaultObjective, spreadDefaultObjective);
 }
 
 const PLACEHOLDER_RE = /\$\{([^:}]+):([^}]+)\}/g;
@@ -73,6 +132,36 @@ function addTitlesPriorityObjectives(list, seen, config) {
 				const placeholderObj = safeString(m[1]);
 				if (placeholderObj) addObjective(list, seen, placeholderObj, placeholderObj);
 			}
+		}
+	}
+}
+
+function addSkillProgressionObjectives(list, seen, config) {
+	const xp = safeString(config?.scoreboards?.xp);
+	const lvl = safeString(config?.scoreboards?.level);
+	const fortuneObjective = safeString(config?.rewards?.primaryObjective ?? config?.rewards?.fortuneObjective);
+	if (xp) addObjective(list, seen, xp, xp);
+	if (lvl) addObjective(list, seen, lvl, lvl);
+	if (fortuneObjective) addObjective(list, seen, fortuneObjective, fortuneObjective);
+
+	const levels = Array.isArray(config?.levels) ? config.levels : [];
+	for (const level of levels) {
+		if (!level || typeof level !== "object") continue;
+		const rewards = level?.rewards && typeof level.rewards === "object" ? level.rewards : null;
+		const adds = Array.isArray(rewards?.scoreboardAdds) ? rewards.scoreboardAdds : [];
+		for (const add of adds) {
+			if (!add || typeof add !== "object") continue;
+			const objective = safeString(add.objective);
+			if (objective) addObjective(list, seen, objective, objective);
+		}
+
+		const requirements = Array.isArray(level?.requirements) ? level.requirements : [];
+		for (const req of requirements) {
+			if (!req || typeof req !== "object") continue;
+			const type = safeString(req.type).toLowerCase();
+			if (type !== "scoreboardmin") continue;
+			const objective = safeString(req.objective);
+			if (objective) addObjective(list, seen, objective, objective);
 		}
 	}
 }
@@ -202,6 +291,12 @@ export function buildScoreboardCatalog() {
 
 	// --- Regeneration (configurable) ---
 	addRegenObjectives(list, seen, skillRegenConfig);
+
+	// --- Mining / levels (configurable) ---
+	addSkillProgressionObjectives(list, seen, miningSkillConfig);
+	addSkillProgressionObjectives(list, seen, foragingSkillConfig);
+	addSkillProgressionObjectives(list, seen, farmingSkillConfig);
+	addSkillProgressionObjectives(list, seen, combatSkillConfig);
 
 	// --- Systems / Titles Priority (configurable) ---
 	addTitlesPriorityObjectives(list, seen, titlesPriorityConfig);

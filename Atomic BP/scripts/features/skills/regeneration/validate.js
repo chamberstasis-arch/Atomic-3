@@ -48,6 +48,245 @@ function validateScoreboardAddsObject(adds, label, warnings) {
 	}
 }
 
+function validateModifierRule(rule, label, warnings) {
+	if (!isObj(rule)) {
+		warnings.push(`${label}: regla inválida (no es objeto)`);
+		return;
+	}
+	const id = asStr(rule.id);
+	if (!id) warnings.push(`${label}: id recomendado (si no, se autogenera)`);
+	if (rule.priority != null && !isFiniteNumber(rule.priority)) warnings.push(`${label}: priority debería ser numérico`);
+	if (rule.mode != null) {
+		const mode = asStr(rule.mode).toLowerCase();
+		if (mode !== "override" && mode !== "add") warnings.push(`${label}: mode debería ser 'override' o 'add'`);
+	}
+
+	if (rule.when != null && !isObj(rule.when)) warnings.push(`${label}: when debería ser objeto`);
+	if (isObj(rule.when)) {
+		if (rule.when.score != null) {
+			if (!isObj(rule.when.score)) warnings.push(`${label}: when.score debería ser objeto`);
+			else {
+				if (!asStr(rule.when.score.objective)) warnings.push(`${label}: when.score.objective es requerido`);
+				const hasRange = isObj(rule.when.score.range) && (rule.when.score.range.min != null || rule.when.score.range.max != null);
+				const hasCompare = asStr(rule.when.score.condition) && isFiniteNumber(rule.when.score.value ?? rule.when.score.int);
+				if (!hasRange && !hasCompare) warnings.push(`${label}: when.score requiere range o condition+value`);
+			}
+		}
+		if (Array.isArray(rule.when.all) && rule.when.all.length === 0) warnings.push(`${label}: when.all no debería estar vacío`);
+		if (Array.isArray(rule.when.any) && rule.when.any.length === 0) warnings.push(`${label}: when.any no debería estar vacío`);
+		if (rule.when.not != null && !isObj(rule.when.not)) warnings.push(`${label}: when.not debería ser objeto`);
+	}
+
+	const effects = isObj(rule.effects) ? rule.effects : rule;
+	if (effects.drops != null && !Array.isArray(effects.drops)) warnings.push(`${label}: effects.drops debería ser array`);
+	if (effects.scoreboardAddsOnBreak != null) {
+		validateScoreboardAddsObject(effects.scoreboardAddsOnBreak, `${label} effects`, warnings);
+	}
+	if (effects.xp != null && !isObj(effects.xp)) warnings.push(`${label}: effects.xp debería ser objeto`);
+	if (isObj(effects.xp)) {
+		if (!isFiniteNumber(effects.xp.base) || Number(effects.xp.base) <= 0) warnings.push(`${label}: effects.xp.base debería ser > 0`);
+		if (!asStr(effects.xp.scalingObjective)) warnings.push(`${label}: effects.xp.scalingObjective es requerido`);
+		if (effects.xp.gainObjective != null && !asStr(effects.xp.gainObjective)) warnings.push(`${label}: effects.xp.gainObjective inválido`);
+		if (effects.xp.levelObjective != null && !asStr(effects.xp.levelObjective)) warnings.push(`${label}: effects.xp.levelObjective inválido`);
+		if (effects.xp.stepPerPoints != null && (!isFiniteNumber(effects.xp.stepPerPoints) || Number(effects.xp.stepPerPoints) <= 0)) {
+			warnings.push(`${label}: effects.xp.stepPerPoints debería ser > 0`);
+		}
+	}
+	if (effects.title != null && !isObj(effects.title)) warnings.push(`${label}: effects.title debería ser objeto`);
+}
+
+function validateSpreadConfig(spread, label, warnings) {
+	if (spread == null) return;
+	if (!isObj(spread)) {
+		warnings.push(`${label}: spread debería ser un objeto`);
+		return;
+	}
+	if (spread.enabled === true && !asStr(spread.objective)) warnings.push(`${label}: spread.objective es requerido cuando spread.enabled=true`);
+	if (spread.objective != null && !asStr(spread.objective)) warnings.push(`${label}: spread.objective inválido`);
+	if (spread.pointsPerExtra != null && (!isFiniteNumber(spread.pointsPerExtra) || Number(spread.pointsPerExtra) <= 0)) {
+		warnings.push(`${label}: spread.pointsPerExtra debería ser > 0`);
+	}
+	if (spread.maxExtraBlocks != null && (!isFiniteNumber(spread.maxExtraBlocks) || Number(spread.maxExtraBlocks) < 0)) {
+		warnings.push(`${label}: spread.maxExtraBlocks debería ser >= 0`);
+	}
+	if (spread.maxVisitedBlocks != null && (!isFiniteNumber(spread.maxVisitedBlocks) || Number(spread.maxVisitedBlocks) <= 0)) {
+		warnings.push(`${label}: spread.maxVisitedBlocks debería ser > 0`);
+	}
+	if (spread.randomness != null && (!isFiniteNumber(spread.randomness) || Number(spread.randomness) < 0 || Number(spread.randomness) > 1)) {
+		warnings.push(`${label}: spread.randomness debería estar entre 0 y 1`);
+	}
+	if (spread.matchMode != null) {
+		const matchMode = asStr(spread.matchMode).toLowerCase();
+		if (matchMode && matchMode !== "same-block-type" && matchMode !== "same-definition" && matchMode !== "same-skill") {
+			warnings.push(`${label}: spread.matchMode debería ser 'same-block-type', 'same-definition' o 'same-skill'`);
+		}
+	}
+	if (spread.sound != null) {
+		if (!isObj(spread.sound)) warnings.push(`${label}: spread.sound debería ser un objeto`);
+		else if (spread.sound.pitchJitter != null && (!isFiniteNumber(spread.sound.pitchJitter) || Number(spread.sound.pitchJitter) < 0 || Number(spread.sound.pitchJitter) > 1)) {
+			warnings.push(`${label}: spread.sound.pitchJitter debería estar entre 0 y 1`);
+		}
+	}
+}
+
+function validateMutationConfig(mutation, label, warnings) {
+	if (mutation == null) return;
+	if (!isObj(mutation)) {
+		warnings.push(`${label}: mutation debería ser un objeto`);
+		return;
+	}
+	if (mutation.enabled !== false && !asStr(mutation.objective)) {
+		warnings.push(`${label}: mutation.objective es requerido cuando mutation.enabled=true`);
+	}
+	if (mutation.scoreMax != null && (!isFiniteNumber(mutation.scoreMax) || Number(mutation.scoreMax) <= 0)) {
+		warnings.push(`${label}: mutation.scoreMax debería ser > 0`);
+	}
+	if (mutation.scoreMin != null && (!isFiniteNumber(mutation.scoreMin) || Number(mutation.scoreMin) < 0)) {
+		warnings.push(`${label}: mutation.scoreMin debería ser >= 0`);
+	}
+	if (mutation.drops != null && !Array.isArray(mutation.drops)) {
+		warnings.push(`${label}: mutation.drops debería ser array`);
+		return;
+	}
+	const drops = Array.isArray(mutation.drops) ? mutation.drops : [];
+	for (const [j, d] of drops.entries()) {
+		if (!Array.isArray(d) || d.length < 5) {
+			warnings.push(`${label}: mutation.drops[${j}] inválido (esperado tuple [dropId,itemId,min,max,chance,...])`);
+			continue;
+		}
+		const itemId = asStr(d[1]);
+		if (!itemId) warnings.push(`${label}: mutation.drops[${j}] itemId vacío`);
+		const minQty = asNum(d[2]);
+		const maxQty = asNum(d[3]);
+		const chance = asNum(d[4]);
+		if (minQty == null || maxQty == null) warnings.push(`${label}: mutation.drops[${j}] min/max inválidos`);
+		if (chance == null || chance < 0 || chance > 100) warnings.push(`${label}: mutation.drops[${j}] chancePct debe ser 0..100`);
+	}
+}
+
+function validateGrowthCycleConfig(growthCycle, label, warnings) {
+	if (growthCycle == null) return;
+	if (!isObj(growthCycle)) {
+		warnings.push(`${label}: growthCycle debería ser un objeto`);
+		return;
+	}
+	if (!asStr(growthCycle.state)) warnings.push(`${label}: growthCycle.state es requerido`);
+	if (!isFiniteNumber(growthCycle.matureValue)) warnings.push(`${label}: growthCycle.matureValue debería ser numérico`);
+	if (!isFiniteNumber(growthCycle.seedValue)) warnings.push(`${label}: growthCycle.seedValue debería ser numérico`);
+}
+
+function validateCropProtectionConfig(cropProtection, label, warnings) {
+	if (cropProtection == null) return;
+	if (!isObj(cropProtection)) {
+		warnings.push(`${label}: cropProtection debería ser un objeto`);
+		return;
+	}
+	const areaFilter = cropProtection.areaIds ?? cropProtection.areas;
+	if (areaFilter != null) {
+		const validType = typeof areaFilter === "string" || isStringArray(areaFilter);
+		if (!validType) warnings.push(`${label}: cropProtection.areaIds (o areas) debería ser string o string[]`);
+	}
+	if (cropProtection.intervalTicks != null) {
+		if (!isFiniteNumber(cropProtection.intervalTicks) || Number(cropProtection.intervalTicks) < 1) {
+			warnings.push(`${label}: cropProtection.intervalTicks debería ser >= 1`);
+		}
+	}
+	if (cropProtection.snapshotTtlMs != null) {
+		if (!isFiniteNumber(cropProtection.snapshotTtlMs) || Number(cropProtection.snapshotTtlMs) < 100) {
+			warnings.push(`${label}: cropProtection.snapshotTtlMs debería ser >= 100`);
+		}
+	}
+	if (cropProtection.enabled != null && typeof cropProtection.enabled !== "boolean") {
+		warnings.push(`${label}: cropProtection.enabled debería ser boolean`);
+	}
+	if (cropProtection.restoreDestroyedCrop != null && typeof cropProtection.restoreDestroyedCrop !== "boolean") {
+		warnings.push(`${label}: cropProtection.restoreDestroyedCrop debería ser boolean`);
+	}
+	if (cropProtection.suppressVanillaDrops != null && typeof cropProtection.suppressVanillaDrops !== "boolean") {
+		warnings.push(`${label}: cropProtection.suppressVanillaDrops debería ser boolean`);
+	}
+	if (cropProtection.dropSuppressTtlMs != null) {
+		if (!isFiniteNumber(cropProtection.dropSuppressTtlMs) || Number(cropProtection.dropSuppressTtlMs) < 100) {
+			warnings.push(`${label}: cropProtection.dropSuppressTtlMs debería ser >= 100`);
+		}
+	}
+	if (cropProtection.dropSuppressRadius != null) {
+		if (!isFiniteNumber(cropProtection.dropSuppressRadius) || Number(cropProtection.dropSuppressRadius) <= 0) {
+			warnings.push(`${label}: cropProtection.dropSuppressRadius debería ser > 0`);
+		}
+	}
+	if (cropProtection.blockedVanillaItemIds != null && !isStringArray(cropProtection.blockedVanillaItemIds)) {
+		warnings.push(`${label}: cropProtection.blockedVanillaItemIds debería ser string[]`);
+	}
+	if (cropProtection.footTrailTtlMs != null) {
+		if (!isFiniteNumber(cropProtection.footTrailTtlMs) || Number(cropProtection.footTrailTtlMs) < 50) {
+			warnings.push(`${label}: cropProtection.footTrailTtlMs debería ser >= 50`);
+		}
+	}
+}
+
+function validateGroupingConfig(grouping, label, warnings) {
+	if (grouping == null) return;
+	if (!isObj(grouping)) {
+		warnings.push(`${label}: grouping debería ser un objeto`);
+		return;
+	}
+	if (grouping.windowMs != null) {
+		if (!isFiniteNumber(grouping.windowMs) || Number(grouping.windowMs) < 250) {
+			warnings.push(`${label}: grouping.windowMs debería ser >= 250`);
+		}
+	}
+	if (grouping.maxMembersPerGroup != null) {
+		if (!isFiniteNumber(grouping.maxMembersPerGroup) || Number(grouping.maxMembersPerGroup) < 1) {
+			warnings.push(`${label}: grouping.maxMembersPerGroup debería ser >= 1`);
+		}
+	}
+	if (grouping.maxOpenGroupsPerScope != null) {
+		if (!isFiniteNumber(grouping.maxOpenGroupsPerScope) || Number(grouping.maxOpenGroupsPerScope) < 1) {
+			warnings.push(`${label}: grouping.maxOpenGroupsPerScope debería ser >= 1`);
+		}
+	}
+	if (grouping.maxClosedPendingPerScope != null) {
+		if (!isFiniteNumber(grouping.maxClosedPendingPerScope) || Number(grouping.maxClosedPendingPerScope) < 0) {
+			warnings.push(`${label}: grouping.maxClosedPendingPerScope debería ser >= 0`);
+		}
+	}
+	if (grouping.maxGroupsPerScopeTotal != null) {
+		if (!isFiniteNumber(grouping.maxGroupsPerScopeTotal) || Number(grouping.maxGroupsPerScopeTotal) < 1) {
+			warnings.push(`${label}: grouping.maxGroupsPerScopeTotal debería ser >= 1`);
+		}
+	}
+	if (grouping.restoreAllWhenNoPlayers != null && typeof grouping.restoreAllWhenNoPlayers !== "boolean") {
+		warnings.push(`${label}: grouping.restoreAllWhenNoPlayers debería ser boolean`);
+	}
+	if (grouping.offlineCheckIntervalTicks != null) {
+		if (!isFiniteNumber(grouping.offlineCheckIntervalTicks) || Number(grouping.offlineCheckIntervalTicks) < 1) {
+			warnings.push(`${label}: grouping.offlineCheckIntervalTicks debería ser >= 1`);
+		}
+	}
+}
+
+function validatePersistenceConfig(persistence, label, warnings) {
+	if (persistence == null) return;
+	if (!isObj(persistence)) {
+		warnings.push(`${label}: persistence debería ser un objeto`);
+		return;
+	}
+	if (persistence.key != null && !asStr(persistence.key)) warnings.push(`${label}: persistence.key inválido`);
+	if (persistence.groupIndexKey != null && !asStr(persistence.groupIndexKey)) warnings.push(`${label}: persistence.groupIndexKey inválido`);
+	if (persistence.groupFallbackKey != null && !asStr(persistence.groupFallbackKey)) warnings.push(`${label}: persistence.groupFallbackKey inválido`);
+	if (persistence.groupShardPrefix != null && !asStr(persistence.groupShardPrefix)) warnings.push(`${label}: persistence.groupShardPrefix inválido`);
+	if (persistence.maxStringLength != null && (!isFiniteNumber(persistence.maxStringLength) || Number(persistence.maxStringLength) < 1000)) {
+		warnings.push(`${label}: persistence.maxStringLength debería ser >= 1000`);
+	}
+	if (persistence.maxEntries != null && (!isFiniteNumber(persistence.maxEntries) || Number(persistence.maxEntries) < 1)) {
+		warnings.push(`${label}: persistence.maxEntries debería ser >= 1`);
+	}
+	if (persistence.retryDelayMs != null && (!isFiniteNumber(persistence.retryDelayMs) || Number(persistence.retryDelayMs) < 100)) {
+		warnings.push(`${label}: persistence.retryDelayMs debería ser >= 100`);
+	}
+}
+
 /**
  * @param {any} config
  * @returns {{ warnings: string[], errors: string[] }}
@@ -58,7 +297,6 @@ export function validateMiningRegenConfig(config) {
 
 /**
  * Valida la config del sistema de regeneración (global para skills).
- * Compat: acepta config.ores/oreBlockId (legacy).
  * @param {any} config
  * @returns {{ warnings: string[], errors: string[] }}
  */
@@ -98,12 +336,12 @@ export function validateSkillRegenConfig(config) {
 		if (areaId) definedAreaIds.add(areaId);
 	}
 
-	const isLegacy = Array.isArray(config.ores) && !Array.isArray(config.blocks);
-	const blocks = Array.isArray(config.blocks) ? config.blocks : Array.isArray(config.ores) ? config.ores : [];
-	if (isLegacy) {
-		warnings.push("Config: 'ores' está deprecado; usa 'blocks' (compat: seguirá funcionando)");
-	}
+	const blocks = Array.isArray(config.blocks) ? config.blocks : [];
 	if (blocks.length === 0) warnings.push("Config: blocks está vacío (no hay bloques regenerables registrados)");
+	validateSpreadConfig(config?.runtime?.spread, "Config runtime", warnings);
+	validateCropProtectionConfig(config?.runtime?.cropProtection, "Config runtime", warnings);
+	validateGroupingConfig(config?.runtime?.grouping, "Config runtime", warnings);
+	validatePersistenceConfig(config?.persistence, "Config", warnings);
 	let usesAreaFilters = false;
 	for (const [i, b] of blocks.entries()) {
 		if (!isObj(b)) {
@@ -111,11 +349,9 @@ export function validateSkillRegenConfig(config) {
 			continue;
 		}
 		if (!asStr(b.id)) errors.push(`Block[${i}]: id vacío`);
-		if (!asStr(b.skill)) {
-			if (isLegacy) warnings.push(`Block[${i}] (${asStr(b.id) || "?"}): skill vacío (legacy) => se asumirá 'mining'`);
-			else errors.push(`Block[${i}] (${asStr(b.id) || "?"}): skill vacío`);
-		}
-		const blockId = asStr(b.blockId || b.oreBlockId);
+		if (!asStr(b.skill)) errors.push(`Block[${i}] (${asStr(b.id) || "?"}): skill vacío`);
+		if (b.familyId != null && !asStr(b.familyId)) warnings.push(`Block[${i}] (${asStr(b.id) || "?"}): familyId inválido`);
+		const blockId = asStr(b.blockId);
 		if (!blockId) errors.push(`Block[${i}] (${asStr(b.id) || "?"}): blockId vacío`);
 		// '*' soportado (exact/prefix/glob) por registry.js
 
@@ -137,15 +373,8 @@ export function validateSkillRegenConfig(config) {
 		}
 
 		// Sonidos (opcional)
-		if (b.sound != null) {
-			// legacy
-			if (typeof b.sound !== "string") warnings.push(`Block[${i}] (${asStr(b.id) || "?"}): sound (legacy) debería ser string`);
-			else warnings.push(`Block[${i}] (${asStr(b.id) || "?"}): sound (legacy) está deprecado, usa sounds:[{id,volume,pitch}]`);
-		}
 		if (b.sounds != null) {
-			if (isStringArray(b.sounds)) {
-				warnings.push(`Block[${i}] (${asStr(b.id) || "?"}): sounds como string[] está deprecado, usa sounds:[{id,volume,pitch}]`);
-			} else if (!isSoundObjArray(b.sounds)) {
+			if (!isSoundObjArray(b.sounds)) {
 				warnings.push(`Block[${i}] (${asStr(b.id) || "?"}): sounds debería ser Array<{id,volume?,pitch?}>`);
 			}
 		}
@@ -175,20 +404,22 @@ export function validateSkillRegenConfig(config) {
 		if (b.scoreboardAddsOnBreak != null) {
 			validateScoreboardAddsObject(b.scoreboardAddsOnBreak, `Block[${i}] (${asStr(b.id) || "?"})`, warnings);
 		}
+		validateSpreadConfig(b.spread, `Block[${i}] (${asStr(b.id) || "?"})`, warnings);
+		validateMutationConfig(b.mutation, `Block[${i}] (${asStr(b.id) || "?"})`, warnings);
+		validateGrowthCycleConfig(b.growthCycle, `Block[${i}] (${asStr(b.id) || "?"})`, warnings);
 
 		// Métricas por-modifier
 		if (b.modifiers != null) {
-			if (!isObj(b.modifiers)) {
-				warnings.push(`Block[${i}] (${asStr(b.id) || "?"}): modifiers debería ser un objeto`);
-			} else {
-				for (const [mk, mv] of Object.entries(b.modifiers)) {
-					if (!isObj(mv)) continue;
-					validateScoreboardAddsObject(
-						mv.scoreboardAddsOnBreak,
-						`Block[${i}] (${asStr(b.id) || "?"}) modifier '${asStr(mk) || "?"}'`,
+			if (Array.isArray(b.modifiers)) {
+				for (let ruleIndex = 0; ruleIndex < b.modifiers.length; ruleIndex++) {
+					validateModifierRule(
+						b.modifiers[ruleIndex],
+						`Block[${i}] (${asStr(b.id) || "?"}) modifiers[${ruleIndex}]`,
 						warnings
 					);
 				}
+			} else {
+				warnings.push(`Block[${i}] (${asStr(b.id) || "?"}): modifiers debería ser array de reglas`);
 			}
 		}
 

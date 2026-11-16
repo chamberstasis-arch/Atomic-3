@@ -232,7 +232,10 @@ function tickCalc(cfg) {
 	}
 
 	for (const key of cacheByPlayerKey.keys()) {
-		if (!active.has(key)) cacheByPlayerKey.delete(key);
+		if (!active.has(key)) {
+			cacheByPlayerKey.delete(key);
+			lastDebugMsByPlayerKey.delete(key);
+		}
 	}
 }
 

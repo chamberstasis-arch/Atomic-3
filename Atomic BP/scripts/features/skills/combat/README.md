@@ -16,12 +16,19 @@ Módulo central del sistema de combate custom. Agrupa toda la lógica relacionad
 skills/
   combat/
     README.md                 ← Este documento (master)
-    calc/                      ← Fórmula de daño final (lee *TotalH de lecture/)
+    config.js                 ← Config skill combat (niveles, XP por mob, loot)
+    index.js                  ← Registro en skills/core + init de XP/Loot
+    match.js                  ← Matching de mobs por typeId/nameTag/mainhandName
+    xp.js                     ← XP por kill (usa ExpCombateTotalH desde lecture)
+    loot.js                   ← Drops custom + política de supresión vanilla
+    calc/                      ← Fórmula de daño final + mitigación defensiva
       README.md
       config.js
       index.js
       scoreboard.js
       utilMath.js
+      defense/
+        README.md
     health/                   ← Vida custom por scoreboards (players + mobs)
       README.md
       index.js 
@@ -57,10 +64,10 @@ skills/
       scoreboard.js
       hologram.js
       particles.js
-    defense/                  ← (Pendiente) Reducción de daño por defensa en mobs
-      README.md
+    defense/                  ← (Deprecado) referencia histórica del módulo
+      README.md               ← Redirige a calc/defense
   lecture/                    ← Centralización de lectura de lore + escritura de *TotalH
-  Centralizacion.md           ← Plan de reestructuración de skills/
+  README.md                   ← Índice maestro actual de skills
   farming/
   fishing/
   foraging/
@@ -131,14 +138,14 @@ Aplica a:
 
 Cada estadística se descompone en cuatro capas aditivas.
 
-> **Estado actual vs planificado**: hoy se usan scoreboards como `DMGH` (personal) y `DtotalH` (total). La nomenclatura se migrará a la convención `<Stat><Capa>H` descrita aquí. Ver [Centralizacion.md](../Centralizacion.md) para el plan de migración.
+> **Estado actual**: el combate todavía consume algunos outputs legacy como `ProbabilidadCriticaTotal`, `DtotalH` y `MtotalH`, pero la lectura de lore ya está centralizada en `lecture/` y la progresión compartida no-combate vive en `skills/core/`.
 
 | Capa | Scoreboard planificado (ej: Daño) | Scoreboard actual (ej: Daño) | Fuente | Mutabilidad |
 |---|---|---|---|---|
 | **Personal** | `DanoPersonalH` | `DMGH` | Scoreboard editable del jugador | Editable por comandos/scripts |
 | **Equipamiento** | `DanoEquipamientoH` | *(calculado en memoria)* | Suma del valor Total del lore de los 6 slots | Recalculado automáticamente |
 | **Otros** | `DanoOtrosH` | *(no existe aún)* | Buffs, efectos, habilidades temporales | Escrito por sistemas externos |
-| **Total** | `DanoTotalH` | `DanoFinalSC` / `DtotalH` | `Personal + Equipamiento + Otros` | Calculado; solo lectura |
+| **Total** | `DanoTotalH` | `DanoTotalH` | `Personal + Equipamiento + Otros` | Calculado; solo lectura |
 
 $$
 Total = Personal + Equipamiento + Otros
@@ -169,7 +176,7 @@ Todas siguen la convención Personal/Equipamiento/Otros/Total:
 | Mutación Activa | float | `Mutación Activa:` |
 | Experiencia de Cosecha | int | `Experiencia de Cosecha:` |
 
-> Las estadísticas de minería, tala y cosecha son consumidas por `skills/mining/`, `skills/foraging/` y `skills/farming/` respectivamente, pero la **lectura del lore** se centraliza en `calc/` (y a futuro en `lecture/`).
+> Las estadísticas de minería, tala y cosecha son consumidas por `skills/mining/`, `skills/foraging/` y `skills/farming/` respectivamente, pero la **lectura del lore** ya está centralizada en `lecture/`.
 
 ### 3.3 Equipamiento leído
 
@@ -199,8 +206,12 @@ Detalles completos en [combat/calc/README.md](calc/README.md).
 **Entradas**: `DanoTotalH`, `PoderTotalH`, `DanoCritTotalH`, `ProbCritTotalH`, `MATotalH`, `MMTotalH` (y totales de defensa/mana).
 **Salidas**: `DanoFinalSC`, `DanoFinalCC`, `ProbabilidadCriticaTotal`, `DtotalH`, `MtotalH`.
 
+Compatibilidad de transición:
+- Entrada crítica: prioriza `ProbCritTotalH` y mantiene compatibilidad con `ProbabilidadCriticaTotal`.
+- Entrada de defensa: prioriza `DefensaTotalH` y mantiene compatibilidad con `DtotalH`.
+
 Optimizaciones implementadas:
-- **Cache por firma de equipo**: solo recalcula si cambió el item (typeId + nameTag + lore) o las stats base.
+- **Cache por jugador e inputs relevantes**: solo recalcula cuando cambian los totals o entradas relevantes consumidas por el calculador.
 - **Escritura condicional**: solo actualiza scoreboards si el valor calculado difiere del anterior.
 - **Early-exit**: si `H != 1`, pone salidas a 0 y continúa.
 
@@ -211,7 +222,7 @@ Sistema de vida alternativo basado en los scoreboards `Vida` y `VidaMaxTotalH`, 
 Scoreboards clave:
 - `Vida`: vida actual (clamped a `0..VidaMaxTotalH`).
 - `VidaMaxH`: vida máxima base/personal (inicializada a 100 la primera vez).
-- `VidaMaxTotalH`: vida máxima total (`VidaMaxH + VidaGear`), calculada por `calc/`.
+- `VidaMaxTotalH`: vida máxima total, escrita por `lecture/` dentro del modelo por capas.
 - `VidaAbsorcion`: escudo temporal (manzanas de oro). Se consume antes que `Vida`.
 - `HDead`: flag interno de muerte lógica.
 
@@ -229,6 +240,10 @@ Aplica el daño calculado al scoreboard `Vida` cuando ocurre un golpe melee. No 
 Flujos soportados:
 - **Player → Entity**: usa `DanoFinalSC`/`DanoFinalCC` + roll de crítico con `ProbabilidadCriticaTotal`. Reduce por defensa enemiga (`DtotalH`).
 - **Mob → Player**: usa `DMGH` del mob. Reduce por defensa del jugador (`DtotalH`).
+
+Compatibilidad actual de scoreboards:
+- Defensa objetivo: intenta `DefensaTotalH` y usa `DtotalH` como fallback.
+- Probabilidad de crítico: intenta `ProbCritTotalH` y usa `ProbabilidadCriticaTotal` como fallback.
 
 Fórmula de reducción por defensa:
 
@@ -277,9 +292,15 @@ El daño de efectos **ignora** `VidaAbsorcion` (bypasea la absorción).
 
 Detalles en [effects/EFFECTS.md](effects/EFFECTS.md).
 
-### 4.7 `defense/` — Defensa de mobs (pendiente)
+### 4.7 `calc/defense` — Mitigación de daño
 
-Planificado para documentar estadísticas defensivas de mobs (resistencias, inmunidades, reducciones especiales).
+La responsabilidad de mitigación defensiva se define bajo `combat/calc/defense`.
+
+Objetivo de diseño:
+- centralizar la fórmula defensiva y futuras mitigaciones (resistencias/caps/inmunidades) en una capa explícita,
+- evitar que `damage_dealt` sea dueño de reglas de mitigación.
+
+Referencia: [combat/calc/defense/README.md](calc/defense/README.md).
 
 ---
 
@@ -348,10 +369,10 @@ DañoBaseFinal = (1 + DañoTotal) \times (1 + \frac{Poder}{10}) \times MA \times
 $$
 
 Donde:
-- `DañoTotal` = stat base del jugador + suma de daño del equipamiento.
-- `Poder` = stat de poder del equipamiento (default 0).
-- `MA` = `MAH / 10` (Multiplicador Aditivo; default 1.0).
-- `MM` = `MMH / 10` (Multiplicador Multiplicativo; default 1.0).
+- `DañoTotal` = `DanoTotalH`.
+- `Poder` = `PoderTotalH` o 0 si el sistema aún no lo conecta a la fórmula.
+- `MA` = `MATotalH / 10`.
+- `MM` = `MMTotalH / 10`.
 - `Bonus` = bonus plano (default 0).
 
 Protecciones: si `MA` o `MM` son 0, `NaN` o `undefined`, se tratan como 1.
@@ -387,7 +408,7 @@ $$
 4. **Escrituras mínimas**: solo se actualizan scoreboards cuando el valor realmente cambió.
 5. **Rendimiento**: un solo `system.runInterval` central (no uno por jugador ni por entidad). Rate-limit y pooling donde corresponda.
 6. **Robustez defensiva**: todo parsing es best-effort; valores faltantes se tratan como 0. Errores se silencian (`void e`) para no romper el loop.
-7. **API nativa primero**: preferir `world.scoreboard` para leer/escribir scores. Usar `runCommandAsync` solo como fallback.
+7. **API nativa primero**: preferir `world.scoreboard` para leer/escribir scores. Usar `runCommand` (síncrono; `runCommandAsync` ya no existe en Scripting V2) solo como fallback.
 8. **Sin APIs experimentales**: solo Script API estable de `@minecraft/server` 2.4.0.
 9. **Sin dynamic properties**: todo va en scoreboards + cache en memoria volátil (`Map` por player ID).
 10. **IDs ASCII**: todos los nombres de scoreboards y archivos evitan caracteres especiales (ñ, acentos).
@@ -427,7 +448,7 @@ Existe `skills/lecture/` como módulo dedicado exclusivamente a la **lectura cen
 
 Responsabilidades de `lecture/`:
 - Lectura de los 6 slots de equipamiento.
-- Parsing de todas las estadísticas del lore (las 16 listadas en §3.2).
+- Parsing de todas las estadísticas del lore documentadas para skills y combate.
 - Escritura de los scoreboards de capa **Equipamiento** (ej. `DanoEquipamientoH`) y los **Totales** `*TotalH`.
 
 Responsabilidades que **permanecen** en `combat/calc/`:
@@ -447,7 +468,24 @@ DanoOtrosH          ← Escrito por efectos, buffs, etc.
 DanoTotalH          ← Suma de las tres capas anteriores
 ```
 
-Esto reemplazará gradualmente los scoreboards actuales (`DMGH`, `DanoFinalSC`, etc.) con una nomenclatura uniforme.
+Esto reemplaza gradualmente los scoreboards base legacy (`DMGH`, `CDH`, `CCH`, `DH`, `MH`) con una nomenclatura uniforme, manteniendo outputs legacy de `combat/calc/` mientras existan consumidores de compatibilidad.
+
+### 9.4 Estado de integración con `skills/core`
+
+`combat/` ya está integrado al sistema de progresión por niveles de `skills/core/` con `skillId="combat"`.
+
+Estado actual:
+- `combat/index.js` registra la skill en core (`registerSkillDefinition("combat", ...)`).
+- `combat/xp.js` consume kills player->mob desde `damage_dealt/byplayer` y suma XP en `SkillXpCombate`.
+- `lecture/` provee `ExpCombateTotalH` para bonus de XP por lore/equipamiento.
+- `combat/loot.js` aplica drops custom y política estricta de vanilla drops según killer/H/whitelist.
+
+Reglas operativas de drops vanilla:
+- Asesino player con `H==1`: suppress vanilla por defecto.
+- Muerte natural/sin asesino player válido: suppress vanilla por defecto.
+- Asesino player con `H==0`: vanilla permitido por defecto.
+- `allowVanilla` por entrada de `mobLoot` habilita excepción explícita.
+- Armadura/equipo vanilla del mob se suprime por defecto salvo `allowArmorVanilla` explícito.
 
 ---
 
@@ -505,7 +543,7 @@ const EFFECT_DEFINITIONS = {
 ### 10.4 Rendimiento
 
 - **Un solo interval para cálculo** (ya implementado). No crear intervals por jugador.
-- **Firma de equipamiento para cache** (`typeId|nameTag|lore.join`): recalcular solo cuando la firma cambie.
+- **Cache coherente con lecture**: si se usa una firma de equipamiento, debe producirla `lecture/` o derivarse de sus totals; `combat/calc/` no debe volver a leer equipo por su cuenta.
 - **Evitar `getPlayers()` repetido**: llamar una vez por tick y reutilizar el array.
 - **Batch de escrituras**: si se implementa `lecture/` como módulo separado, estructurar el pipeline para que una sola pasada por jugador lea todo y escriba todo, en vez de múltiples pasadas.
 - **No spawnear entidades en loops de alta frecuencia**: los hologramas solo se crean en eventos puntuales (golpes, ticks de efecto), nunca en el loop de cálculo.

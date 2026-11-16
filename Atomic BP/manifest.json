@@ -1,11 +1,11 @@
 {
   "format_version": 2,
   "header": {
-    "description": "Atomic tres 1.0",
-    "name": "Atomic3 Functions",
+    "description": "Atomic Behavior Pack",
+    "name": "Atomic BP",
     "uuid": "21bf0072-c1c9-4d89-a9c2-2665016f86be",
     "version": [1, 0, 1],
-    "min_engine_version": [1, 21, 93]
+    "min_engine_version": [1, 21, 130]
   },
   "metadata": {
     "authors": [
@@ -21,7 +21,7 @@
       "version": [1, 0, 1]
     },
     {
-      "description": "Atomic3 Scripts",
+      "description": "Atomic Scripts",
       "type": "script",
       "language": "javascript",
       "uuid": "54ef1c6b-02e4-4260-b23b-a627c14792c5",

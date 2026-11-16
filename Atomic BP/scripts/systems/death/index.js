@@ -16,11 +16,10 @@ function getObjectiveCached(id) {
 	if (objectiveCache.has(id)) return objectiveCache.get(id) ?? null;
 	try {
 		const obj = world.scoreboard.getObjective(id) ?? null;
-		objectiveCache.set(id, obj);
+		if (obj) objectiveCache.set(id, obj);
 		return obj;
 	} catch (e) {
 		void e;
-		objectiveCache.set(id, null);
 		return null;
 	}
 }
@@ -97,7 +96,7 @@ function bestEffortTellraw(target, text) {
 	if (!dim) return false;
 	try {
 		const cmd = `tellraw ${t} {"rawtext":[{"text":${JSON.stringify(message)}}]}`;
-		dim.runCommandAsync(cmd);
+		dim.runCommand(cmd);
 		return true;
 	} catch (e) {
 		void e;
@@ -115,7 +114,7 @@ function sendMessageToPlayer(player, text) {
 		void e;
 	}
 	try {
-		player?.runCommandAsync?.(`tellraw @s {"rawtext":[{"text":${JSON.stringify(String(text ?? ""))}}]}`);
+		player?.runCommand?.(`tellraw @s {"rawtext":[{"text":${JSON.stringify(String(text ?? ""))}}]}`);
 		return true;
 	} catch (e2) {
 		void e2;
@@ -135,7 +134,7 @@ function playDeathSoundBestEffort(player, config) {
 	const volume = Number.isFinite(Number(sound.volume)) ? Number(sound.volume) : 1;
 	const pitch = Number.isFinite(Number(sound.pitch)) ? Number(sound.pitch) : 1;
 	try {
-		player?.runCommandAsync?.(`playsound ${id} @s ~~~ ${volume} ${pitch}`);
+		player?.runCommand?.(`playsound ${id} @s ~~~ ${volume} ${pitch}`);
 	} catch (e) {
 		void e;
 	}

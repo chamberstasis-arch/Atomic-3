@@ -4,22 +4,22 @@ Ruta: `Atomic BP/scripts/features/skills/combat/damage_dealt`
 
 Este feature aplica el **daño real** a la vida custom (`Vida`, scoreboard) cuando ocurre un golpe melee.
 
-No recalcula lore ni stats: **consume** los scoreboards ya calculados por `skills/calc` y deja que `combat/health` se encargue de sincronizar `Vida` con corazones vanilla.
+No recalcula lore ni stats: **consume** los scoreboards ya calculados por `skills/combat/calc` y deja que `combat/health` se encargue de sincronizar `Vida` con corazones vanilla.
 
 ---
 
 ## Gate global (OBLIGATORIO)
 
-Este sistema SOLO corre si **ambas** entidades cumplen:
+Este sistema aplica el gate por flujo:
 
-- `H == 1` en el atacante
-- `H == 1` en el objetivo
+- **Player -> Entity**: requiere `H == 1` en atacante y objetivo.
+- **Mob -> Player**: requiere `H == 1` en el objetivo (player).
 
 Equivalente vanilla:
 
 - `/scoreboard players test <Entidad> H 1..`
 
-Si el atacante o el objetivo no tienen `H==1`, el sistema hace **early-exit** y NO modifica `Vida`.
+Si no se cumple el gate del flujo correspondiente, el sistema hace **early-exit** y NO modifica `Vida`.
 
 ---
 
@@ -38,28 +38,30 @@ No-alcances (por ahora):
 
 - Proyectiles, magia, tridentes, TNT, etc. (MVP usa solo melee).
 - UI/feedback visual (eso vive en `damage_title/`; aquí solo se dejan hooks).
-- Recalcular stats del arma/armadura en el golpe (eso es `skills/calc`).
+- Recalcular stats del arma/armadura en el golpe (eso es `skills/combat/calc`).
 
 ---
 
 ## Dependencias y cómo encaja con lo ya implementado
 
-### `skills/calc` (fuente de verdad del daño)
+### `skills/combat/calc` (fuente de verdad del daño)
 
 Este feature consume scoreboards calculados por:
 
-`Atomic BP/scripts/features/skills/calc`
+`Atomic BP/scripts/features/skills/combat/calc`
 
 Scoreboards relevantes (IDs ASCII):
 
 - Atacante (player):
 	- `DanoFinalSC` (int) — daño teórico sin crítico
 	- `DanoFinalCC` (int) — daño teórico con crítico
-	- `ProbabilidadCriticaTotal` (0..100; si falta, 0)
+	- `ProbCritTotalH` (0..100; prioritario)
+	- `ProbabilidadCriticaTotal` (0..100; fallback legacy)
 - Objetivo (entidad):
-	- `DtotalH` (int) — defensa total (si falta, 0)
+	- `DefensaTotalH` (int; prioritario)
+	- `DtotalH` (int; fallback legacy)
 
-Nota: `skills/calc` también calcula vida máxima total (`VidaMaxTotalH`), pero este feature NO la usa directamente.
+Nota: este feature no calcula ni inicializa `VidaMaxTotalH`; solo consume los outputs que ya llegan desde el pipeline de combate.
 
 ### `combat/health` (vida custom + display)
 
@@ -113,14 +115,20 @@ Vida aplicada:
 
 - `Vida` (dummy): vida actual custom del objetivo.
 
-Inputs (por `skills/calc`):
+Inputs (por `skills/combat/calc`):
 
 - Atacante jugador:
 	- `DanoFinalSC`
 	- `DanoFinalCC`
+	- `ProbCritTotalH` (si existe)
 	- `ProbabilidadCriticaTotal`
 - Objetivo:
+	- `DefensaTotalH` (si existe)
 	- `DtotalH`
+
+Internos de tracking/cooldown:
+- `LastKillerId`
+- `LastKillTick`
 
 Inputs para mobs (MVP):
 
@@ -169,18 +177,18 @@ Inputs (atacante):
 
 - `DanoFinalSC` (int)
 - `DanoFinalCC` (int)
-- `ProbabilidadCriticaTotal` (0..100; si no existe, 0)
+- `ProbCritTotalH` (0..100; si no existe, fallback a `ProbabilidadCriticaTotal`)
 
 Inputs (objetivo):
 
-- `DtotalH` (defensaEnemigo; si no existe, 0)
+- `DefensaTotalH` (defensaEnemigo; si no existe, fallback a `DtotalH`)
 - `Vida` (vida actual; si no existe, tratar como 0 o hacer early-exit según config)
 
 Paso 1: decidir crítico
 
-- `isCrit = random(0..100) < ProbabilidadCriticaTotal`
-- Si `ProbabilidadCriticaTotal >= 100` => crítico garantizado
-- Si `ProbabilidadCriticaTotal <= 0` => nunca crítico
+- `isCrit = random(0..100) < ProbCritTotalH`
+- Si `ProbCritTotalH >= 100` => crítico garantizado
+- Si `ProbCritTotalH <= 0` => nunca crítico
 
 Paso 2: elegir danoBase
 
@@ -230,7 +238,7 @@ Inputs (mob):
 
 Inputs (player):
 
-- `DtotalH` (defensaJugador; si no existe, 0)
+- `DefensaTotalH` (defensaJugador; si no existe, fallback a `DtotalH`)
 - `Vida`
 
 Fórmula:
@@ -297,8 +305,8 @@ Resultado:
 - Si faltan scores como `DtotalH` => tratar como 0.
 - Si faltan scores como `DanoFinalSC/DanoFinalCC` => tratar como 0.
 - Si `Vida` no existe en el objetivo:
-	- MVP recomendado: tratar como 0 y escribirlo solo si se decidió habilitar auto-init.
-	- Alternativa: early-exit (configurable) para no “ensuciar” entidades que no están en el sistema.
+	- Recomendado: tratar como 0 o hacer early-exit según la política del módulo.
+	- No crear objectives ni auto-init de scoreboards desde este feature; la existencia del objective debe venir de `scripts/scoreboards/`.
 
 ---
 

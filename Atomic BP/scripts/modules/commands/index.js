@@ -31,28 +31,28 @@ let didRegisterCommands = false;
  */
 export const commandConfig = {
 	show: {
-		namespace: "atomic3",
+		namespace: "atomic",
 		enabled: true,
 		name: "show",
 		description: "Muestra el item sostenido en la mano primaria.",
 		permission: "Any",
 	},
 	setlore: {
-		namespace: "atomic3",
+		namespace: "atomic",
 		enabled: true,
 		name: "setlore",
 		description: "Agrega o sobreescriba el Lore del objeto en la mano principal",
 		permission: "Admin",
 	},
 	getlore: {
-		namespace: "atomic3",
+		namespace: "atomic",
 		enabled: true,
 		name: "getlore",
 		description: "Emite el lore del item seleccionado en consola (Ctrl + H)",
 		permission: "Admin",
 	},
 	rename: {
-		namespace: "atomic3",
+		namespace: "atomic",
 		enabled: true,
 		name: "rename",
 		description: "Agrega o sobreescriba el nombre del objeto en la mano principal",

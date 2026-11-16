@@ -28,7 +28,7 @@ Motivo: evitar duplicados, facilitar habilitar/deshabilitar comandos, y mantener
 
 Cada comando debe tener estos 5 aspectos **dinámicos** en `commandConfig`:
 
-- `namespace`: string (ej: `"atomic3"`)
+- `namespace`: string (ej: `"atomic"`)
 - `enabled`: boolean (`true/false`)
 - `name`: string (ej: `"show"`)
 - `description`: string
@@ -47,7 +47,7 @@ Ejemplo:
 ```js
 export const commandConfig = {
   show: {
-    namespace: "atomic3",
+    namespace: "atomic",
     enabled: true,
     name: "show",
     description: "Muestra el item sostenido en la mano primaria.",
@@ -131,27 +131,27 @@ Notas sobre argumentos:
 
 - `setlore` usa **un solo argumento String** (es lo más estable para Bedrock/Realms).
 - Los subcomandos se escriben dentro del mismo string:
-  - `/atomic3:setlore "begin"`
-  - `/atomic3:setlore "add <texto>"`
-  - `/atomic3:setlore "apply"`
-  - `/atomic3:setlore "cancel"`
-  - `/atomic3:setlore "clear"`
+  - `/atomic:setlore "begin"`
+  - `/atomic:setlore "add <texto>"`
+  - `/atomic:setlore "apply"`
+  - `/atomic:setlore "cancel"`
+  - `/atomic:setlore "clear"`
 
 Si el texto contiene espacios o `\\n`, usa comillas.
 
 Modo por partes (recomendado para lores muy largos / evitar desconexiones):
 
-- `/atomic3:setlore "begin"` (inicia una edición temporal en memoria)
-- `/atomic3:setlore "add <texto>"` (agrega un bloque; puedes usar `\n` dentro)
-- `/atomic3:setlore "apply"` (aplica el lore acumulado)
-- `/atomic3:setlore "cancel"` (cancela/limpia la edición)
+- `/atomic:setlore "begin"` (inicia una edición temporal en memoria)
+- `/atomic:setlore "add <texto>"` (agrega un bloque; puedes usar `\n` dentro)
+- `/atomic:setlore "apply"` (aplica el lore acumulado)
+- `/atomic:setlore "cancel"` (cancela/limpia la edición)
 
 Nota: estos subcomandos se procesan desde un único parámetro String; por eso se recomienda escribirlos siempre dentro de comillas cuando haya espacios.
 
 Comandos útiles:
 
-- `/atomic3:setlore "help"` o `/atomic3:setlore "?"` (muestra ayuda)
-- `/atomic3:setlore "status"` (muestra estado del buffer de edición)
+- `/atomic:setlore "help"` o `/atomic:setlore "?"` (muestra ayuda)
+- `/atomic:setlore "status"` (muestra estado del buffer de edición)
 
 Nota: `add` inicia automáticamente el modo edición si no se hizo `begin`.
 

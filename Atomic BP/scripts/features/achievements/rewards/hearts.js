@@ -2,44 +2,35 @@ import { world } from "@minecraft/server";
 
 function getObjective(id) {
 	try {
-		return world.scoreboard.getObjective(String(id)) || null;
+		return world.scoreboard.getObjective(String(id)) ?? null;
 	} catch (e) {
 		void e;
 		return null;
 	}
 }
 
-function getScore(player, objectiveId) {
-	const obj = getObjective(objectiveId);
-	if (!obj) return null;
-	const identity = player?.scoreboardIdentity;
-	const name = player?.name;
+function getScore(player, objectiveId, fallback = 0) {
 	try {
-		if (identity) {
-			const v = obj.getScore(identity);
-			if (Number.isFinite(v)) return v;
-		}
+		const obj = getObjective(objectiveId);
+		const identity = player?.scoreboardIdentity;
+		if (!obj || !identity) return fallback;
+		const value = obj.getScore(identity);
+		const n = Math.trunc(Number(value));
+		return Number.isFinite(n) ? n : fallback;
 	} catch (e) {
 		void e;
-	}
-
-	try {
-		if (!name) return 0;
-		const vByName = obj.getScore(String(name));
-		return Number.isFinite(vByName) ? vByName : 0;
-	} catch (e) {
-		void e;
-		return 0;
+		return fallback;
 	}
 }
 
 function setScore(player, objectiveId, value) {
-	const obj = getObjective(objectiveId);
-	if (!obj) return false;
-	const identity = player?.scoreboardIdentity;
-	if (!identity) return false;
 	try {
-		obj.setScore(identity, Math.trunc(Number(value)));
+		const obj = getObjective(objectiveId);
+		const identity = player?.scoreboardIdentity;
+		if (!obj || !identity) return false;
+		const n = Math.trunc(Number(value));
+		if (!Number.isFinite(n)) return false;
+		obj.setScore(identity, n);
 		return true;
 	} catch (e) {
 		void e;
@@ -48,14 +39,19 @@ function setScore(player, objectiveId, value) {
 }
 
 export function handleHeartsMilestone(player, config, totalAchievements) {
-	if (!config?.enabled) return false;
-	const milestoneEvery = Math.max(1, Number(config.milestoneEvery ?? 10));
-	const maxLevel = Math.max(1, Number(config.maxHeartsLevel ?? 5));
-	const heartsObj = String(config.heartsObjective ?? "Corazones");
-	const total = Math.max(0, Math.trunc(Number(totalAchievements ?? 0)));
-	const desiredLevel = Math.min(maxLevel, Math.floor(total / milestoneEvery));
-	const currentLevel = getScore(player, heartsObj) ?? 0;
-	if (desiredLevel <= currentLevel) return false;
-	const ok = setScore(player, heartsObj, desiredLevel);
-	return ok;
+	if (!config?.enabled || !player) return false;
+
+	const every = Math.max(1, Math.trunc(Number(config.milestoneEvery ?? 10)));
+	const total = Math.trunc(Number(totalAchievements));
+	if (!Number.isFinite(total) || total <= 0 || total % every !== 0) return false;
+
+	const objectiveId = String(config.heartsObjective ?? "Corazones").trim();
+	if (!objectiveId) return false;
+
+	const maxLevel = Math.max(0, Math.trunc(Number(config.maxHeartsLevel ?? 5)));
+	const current = getScore(player, objectiveId, 0);
+	if (maxLevel > 0 && current >= maxLevel) return false;
+
+	const next = maxLevel > 0 ? Math.min(maxLevel, current + 1) : current + 1;
+	return setScore(player, objectiveId, next);
 }

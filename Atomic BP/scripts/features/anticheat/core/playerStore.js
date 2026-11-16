@@ -4,8 +4,8 @@
 
 import { getObjectiveFromConfig, getPlayerScore, setPlayerScore, addPlayerScore } from "./scoreboardStore.js";
 
-// Legacy (migración): antes se guardaba en dynamic properties.
-const LEGACY_WARNINGS_KEY = "atomic3:ac_player_warnings";
+// Fallback antiguo por Dynamic Properties si el scoreboard no está disponible.
+const LEGACY_WARNINGS_KEY = "atomic:ac_player_warnings";
 
 let _config = null;
 let _warningsObjective = null;
@@ -13,7 +13,7 @@ let _warningsObjective = null;
 export function initPlayerStore(config) {
 	_config = config != null ? config : null;
 	// Importante: este módulo NO crea objectives.
-	// La creación se hace únicamente en core/scoreboardsInit.js.
+	// La creación se hace únicamente en scripts/scoreboards/init.js.
 }
 
 function ensureWarningsObjective() {

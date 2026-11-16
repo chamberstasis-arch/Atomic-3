@@ -1,10 +1,10 @@
 # Atomic BP — Documentación general
 
 ## Propósito
-Behavior Pack (BP) para Minecraft Bedrock (1.21.131) enfocado en ambientación, utilidades y sistemas de servidor/realm. Incluye scripts, funciones y entidades que extienden la jugabilidad.
+Behavior Pack (BP) para Minecraft Bedrock (1.21.132) enfocado en ambientación, utilidades y sistemas de servidor/realm. Incluye scripts, funciones y entidades que extienden la jugabilidad.
 
 ## Compatibilidad y versiones
-- **min_engine_version**: 1.21.93 en el manifest del BP.
+- **min_engine_version**: 1.21.130 en el manifest del BP.
 - **Script API**: `@minecraft/server` 2.4.0 y `@minecraft/server-ui` 2.0.0.
 - **Dependencia RP**: el BP depende del Resource Pack (UUID en manifest).
 
@@ -40,11 +40,11 @@ Behavior Pack (BP) para Minecraft Bedrock (1.21.131) enfocado en ambientación, 
 - Catálogo de items personalizados en [Atomic BP/items/](Atomic%20BP/items/).
 
 ## Feature destacada: Hologramas
-- Documentación general: [Atomic BP/docs/hologram.md](Atomic%20BP/docs/hologram.md)
+- Documentación general: [Atomic BP/docs/holograms/hologram.md](Atomic%20BP/docs/holograms/hologram.md)
 - Especificación de interpolación con scoreboards: [Atomic BP/docs/holograms/hologram-scoreboard-interpolation.md](Atomic%20BP/docs/holograms/hologram-scoreboard-interpolation.md)
 
-## Feature planificada: Archivements
-- Documento base: [Atomic BP/scripts/features/archivements/arch-list/LOGROS.md](Atomic%20BP/scripts/features/archivements/arch-list/LOGROS.md)
+## Feature activa: Achievements
+- Configuración: [Atomic BP/scripts/features/achievements/config.js](Atomic%20BP/scripts/features/achievements/config.js)
 - Requisitos clave:
   - Logros “only-one-time”.
   - Mensajería con wrapping de 25 caracteres por línea.

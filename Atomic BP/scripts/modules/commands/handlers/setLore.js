@@ -12,8 +12,8 @@ const SUCCESS_CLEARED_MESSAGE = "§fLore eliminado correctamente";
 const TOO_MANY_LINES_MESSAGE = "§cDemasiadas líneas de lore";
 const LINE_TOO_LONG_MESSAGE = "§cUna línea del lore es demasiado larga";
 const TOO_MANY_FORMAT_CODES_MESSAGE = "§cEl lore contiene demasiados códigos de formato";
-const DRAFT_STARTED_MESSAGE = "§fModo edición iniciado. Usa: §a/atomic3:setlore \"add <texto>\"§f y luego §a/atomic3:setlore \"apply\"";
-const DRAFT_AUTO_STARTED_MESSAGE = "§fModo edición iniciado automáticamente. Usa §a/atomic3:setlore \"apply\"§f para aplicar.";
+const DRAFT_STARTED_MESSAGE = "§fModo edición iniciado. Usa: §a/atomic:setlore \"add <texto>\"§f y luego §a/atomic:setlore \"apply\"";
+const DRAFT_AUTO_STARTED_MESSAGE = "§fModo edición iniciado automáticamente. Usa §a/atomic:setlore \"apply\"§f para aplicar.";
 const DRAFT_CLEARED_MESSAGE = "§fEdición cancelada";
 const DRAFT_APPLIED_MESSAGE = "§fLore aplicado desde edición";
 const DRAFT_EMPTY_MESSAGE = "§cNo hay texto en edición";
@@ -21,15 +21,15 @@ const HELP_HEADER = "§f§lsetlore§r§f — ayuda";
 const HELP_MESSAGE = [
 	HELP_HEADER,
 	"§7Uso directo:",
-	"§f- §a/atomic3:setlore \"<texto>\"§7 (usa \\n para líneas)",
+	"§f- §a/atomic:setlore \"<texto>\"§7 (usa \\n para líneas)",
 	"§7Edición (recomendado para lores largos/Realms):",
-	"§f- §a/atomic3:setlore \"begin\"",
-	"§f- §a/atomic3:setlore \"add <texto>\"§7 (si hay espacios, va todo entre comillas)",
-	"§f- §a/atomic3:setlore \"apply\"",
-	"§f- §a/atomic3:setlore \"cancel\"",
+	"§f- §a/atomic:setlore \"begin\"",
+	"§f- §a/atomic:setlore \"add <texto>\"§7 (si hay espacios, va todo entre comillas)",
+	"§f- §a/atomic:setlore \"apply\"",
+	"§f- §a/atomic:setlore \"cancel\"",
 	"§7Extras:",
-	"§f- §a/atomic3:setlore \"status\"§7 (muestra estado de la edición)",
-	"§f- §a/atomic3:setlore \"clear\"§7 (elimina el lore del item)",
+	"§f- §a/atomic:setlore \"status\"§7 (muestra estado de la edición)",
+	"§f- §a/atomic:setlore \"clear\"§7 (elimina el lore del item)",
 ].join("\n");
 
 const MAX_LORE_LINES = 40;
@@ -530,7 +530,7 @@ export function handleSetLoreCommand(origin, ...loreArgs) {
 				"§f§lsetlore§r§f — estado",
 				`§7En edición: §f${parts.length}§7 bloque(s)`,
 				`§7Tamaño: §f${joined.length}§7 char(s)`,
-				"§7Usa §a/atomic3:setlore \"apply\"§7 para aplicar o §a/atomic3:setlore \"cancel\"§7 para cancelar.",
+				"§7Usa §a/atomic:setlore \"apply\"§7 para aplicar o §a/atomic:setlore \"cancel\"§7 para cancelar.",
 			].join("\n")
 		);
 		return;
@@ -554,9 +554,9 @@ export function handleSetLoreCommand(origin, ...loreArgs) {
 			debugLogArgsOnce("add-missing-payload", { rawCombined, loreArgs });
 			player.sendMessage(
 				[
-					"§cUso: §f/atomic3:setlore \"add <texto>\"",
-					"§7Ejemplo: §a/atomic3:setlore \"add hola mundo\"",
-					"§7Línea en blanco: §a/atomic3:setlore \"add \\n\"",
+					"§cUso: §f/atomic:setlore \"add <texto>\"",
+					"§7Ejemplo: §a/atomic:setlore \"add hola mundo\"",
+					"§7Línea en blanco: §a/atomic:setlore \"add \\n\"",
 				].join("\n")
 			);
 			return;
@@ -574,7 +574,7 @@ export function handleSetLoreCommand(origin, ...loreArgs) {
 		entry.updatedAt = nowMs;
 		loreDrafts.set(draftKey, entry);
 		if (!hadEntry) player.sendMessage(DRAFT_AUTO_STARTED_MESSAGE);
-		player.sendMessage("§fAgregado a la edición. Usa §a/atomic3:setlore \"apply\"§f para aplicar.");
+		player.sendMessage("§fAgregado a la edición. Usa §a/atomic:setlore \"apply\"§f para aplicar.");
 		return;
 	}
 

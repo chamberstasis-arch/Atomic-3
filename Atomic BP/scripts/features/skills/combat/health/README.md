@@ -21,7 +21,7 @@ Reglas:
 Caso especial:
 - Si `VidaMaxTotalH==0`, se trata como **inmortal lógica** (no se ejecuta kill por `Vida<=0`).
 
-## Absorción (corazones amarillos) — Opción A
+## Absorción (corazones amarillos) — Implementación actual
 
 Objetivo: que la absorción vanilla (p.ej. manzana de oro) **no rompa** el sistema de vida, tratándola como una “bolsa” aparte.
 
@@ -77,6 +77,11 @@ El debug imprime (rate-limited) datos como:
 - AbsHP detectado
 - Fuente (`effect`/`component`/`health`)
 - `VidaAbsorcion`, `Vida`, `VidaMaxTotalH`
+
+## Seguridad y hardening
+
+- **NaN guard en `clampVida`**: Si `VidaMaxTotalH` se lee como `NaN` (score inexistente o corrupto), `clampVida` hace early-return sin modificar `Vida`, evitando propagación de NaN a través de `Math.min`/`Math.max`.
+- **isValid en `syncMobs`**: El loop de mobs tracked valida `entity.isValid` antes de acceder propiedades; entidades inválidas se eliminan del Set inmediatamente.
 
 Nota: en algunos runtimes no existe un componente directo de absorción; por eso el sistema deriva AbsHP desde el efecto `absorption` cuando está disponible.
 

@@ -36,8 +36,9 @@ function getPlayerKey(player) {
 function clampVida(vida, vidaMax) {
 	const v = Math.trunc(Number(vida));
 	if (!Number.isFinite(v)) return 0;
-	if (vidaMax <= 0) return v;
-	return Math.max(0, Math.min(vidaMax, v));
+	const vm = Number(vidaMax);
+	if (!Number.isFinite(vm) || vm <= 0) return v;
+	return Math.max(0, Math.min(vm, v));
 }
 
 function ensurePlayerVidaInitialized(player, config) {
@@ -127,7 +128,7 @@ function debugTellBestEffort(player, message, world = undefined) {
 		void e;
 	}
 	try {
-		player?.runCommandAsync?.(`tellraw @s {"rawtext":[{"text":${JSON.stringify(String(message))}}]}`);
+		player?.runCommand?.(`tellraw @s {"rawtext":[{"text":${JSON.stringify(String(message))}}]}`);
 	} catch (e) {
 		void e;
 	}
@@ -144,7 +145,7 @@ function clearAbsorptionEffectBestEffort(player) {
 		void e;
 	}
 	try {
-		player?.runCommandAsync?.("effect @s clear absorption");
+		player?.runCommand?.("effect @s clear absorption");
 		return true;
 	} catch (e) {
 		void e;
@@ -352,7 +353,7 @@ function killPlayerBestEffort(player) {
 		void e;
 	}
 	try {
-		player.runCommandAsync?.("kill @s");
+		player.runCommand?.("kill @s");
 		return true;
 	} catch (e) {
 		void e;
@@ -528,6 +529,8 @@ export function syncPlayers(world, config = undefined) {
 					}
 				}
 				// delta negativo se ignora: NO bajar Vida.
+				// Diseño: Vida solo se reduce por damage_dealt (fuente única). El daño vanilla
+				// no-letal pasa para knockback; health/ corrige HP vanilla al ratio en el step 2).
 			}
 
 			// 2) Sincronizar scoreboard -> corazones vanilla SIEMPRE.

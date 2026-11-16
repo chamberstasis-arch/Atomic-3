@@ -28,7 +28,7 @@
         "destroy_speeds": [
           {
             "block": {
-              "tags": "q.any_tag('wooden_axe_diggable','stone_axe_diggable','copper_axe_diggable','iron_axe_diggable','minecraft:wooden_axe_diggable','minecraft:stone_axe_diggable','minecraft:copper_axe_diggable','minecraft:iron_axe_diggable')"
+              "tags": "q.any_tag('wood','minecraft:is_axe_item_destructible')"
             },
             "speed": 6
           }

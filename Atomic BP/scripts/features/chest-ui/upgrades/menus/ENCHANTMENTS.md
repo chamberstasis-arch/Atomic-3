@@ -931,8 +931,8 @@ Este documento define el mapeo de “qué stat toca” cada Tipo A. Los Tipo B/C
 #### Caso C: Item custom sin glint → con glint
 
 ```javascript
-// Si typeId es "atomic3:chainmail_boots_plain"
-// Cambiar a "atomic3:chainmail_boots_glint"
+// Si typeId es "atomic:chainmail_boots_plain"
+// Cambiar a "atomic:chainmail_boots_glint"
 
 const glintMapping = {
     "_plain": "_glint",

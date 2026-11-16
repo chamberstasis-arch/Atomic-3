@@ -4,7 +4,7 @@ import { world, system, EquipmentSlot } from "@minecraft/server";
 const DEFAULT_OPTIONS = {
   slots: 10,
   loopTicks: 5,
-  keyPrefix: "atomic3:inv:"
+  keyPrefix: "atomic:inv:"
 };
 
 function keyFor(prefix, num) {
@@ -12,13 +12,23 @@ function keyFor(prefix, num) {
 }
 
 function snapshotEnchantments(item) {
-  const enchComp = item && typeof item.getComponent === "function" ? item.getComponent("minecraft:enchantable") : null;
-  if (!enchComp) return [];
-  // getEnchantments devuelve Enchantment[] (type + level)
-  return enchComp.getEnchantments().map(e => ({
-    typeId: e.type.id,
-    level: e.level
-  }));
+  try {
+    const enchComp = item && typeof item.getComponent === "function" ? item.getComponent("minecraft:enchantable") : null;
+    if (!enchComp || typeof enchComp.getEnchantments !== "function") return [];
+    const enchantments = enchComp.getEnchantments();
+    if (!enchantments || typeof enchantments[Symbol.iterator] !== "function") return [];
+    const out = [];
+    for (const e of enchantments) {
+      const typeId = e?.type?.id ?? e?.typeId ?? e?.id;
+      const level = Math.trunc(Number(e?.level));
+      if (!typeId || !Number.isFinite(level)) continue;
+      out.push({ typeId: String(typeId), level });
+    }
+    return out;
+  } catch (e) {
+    void e;
+    return [];
+  }
 }
 
 
@@ -38,7 +48,13 @@ function snapshotItem(it) {
 function buildItem(data) {
   if (!data) return undefined;
 
-  const item = new mc.ItemStack(data.typeId, data.amount);
+  let item;
+  try {
+    item = new mc.ItemStack(String(data.typeId), Math.max(1, Math.trunc(Number(data.amount) || 1)));
+  } catch (e) {
+    void e;
+    return undefined;
+  }
 
   if (data.nameTag) item.nameTag = data.nameTag;
   if (data.lore && data.lore.length) item.setLore(data.lore);
@@ -48,10 +64,8 @@ function buildItem(data) {
   if (enchComp && Array.isArray(data.enchantments) && data.enchantments.length) {
     for (const e of data.enchantments) {
       try {
-        enchComp.addEnchantment({
-          type: new mc.EnchantmentType(e.typeId),
-          level: e.level
-        });
+        const type = mc.EnchantmentTypes?.get?.(String(e.typeId)) ?? new mc.EnchantmentType(String(e.typeId));
+        enchComp.addEnchantment({ type, level: Math.trunc(Number(e.level)) });
       } catch (err) {
         void err;
         // Si el encantamiento no aplica o level inválido, se ignora para no romper la carga.

@@ -2,8 +2,8 @@ export const DEFAULT_PLAYER_VIDA_MAX = 100;
 export const MOB_VIDA_MULTIPLIER = 5;
 
 // Intervalos (ticks)
-export const DEFAULT_PLAYER_LOOP_TICKS = 10;
-export const DEFAULT_MOB_LOOP_TICKS = 20;
+export const DEFAULT_PLAYER_LOOP_TICKS = 2;
+export const DEFAULT_MOB_LOOP_TICKS = 10;
 export const DEFAULT_MOB_SCAN_TICKS = 40;
 
 export function defaultVidaMaxForPlayer(player, config = undefined) {

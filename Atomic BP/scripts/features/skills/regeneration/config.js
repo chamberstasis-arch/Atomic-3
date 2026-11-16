@@ -14,13 +14,41 @@
  * @typedef {[number|string, string, number, number, number, (string|null|undefined), (string|string[]|null|undefined)]} DropEntryTuple
  *
  * @typedef {{
- *  match: string[],
- *  priority: number,
- *  mode: "override"|"add",
- *  drops?: DropEntryTuple[],
- *  // Métricas extra si este modifier aplica (scoreboard players add)
- *  scoreboardAddsOnBreak?: Record<string, number>,
- * }} OreModifier
+ *  id: string,
+ *  priority?: number,
+ *  mode?: "override"|"add",
+ *  when?: {
+ *    all?: any[],
+ *    any?: any[],
+ *    not?: any,
+ *    score?: { objective: string, range?: {min?:number,max?:number}, condition?: string, value?: number },
+ *    area?: { id?: string, aabb?: { min: Vec3, max: Vec3 } },
+ *    skill?: string|{ equals: string },
+ *  },
+ *  effects?: {
+ *    drops?: DropEntryTuple[],
+ *    scoreboardAddsOnBreak?: Record<string, number>,
+	 *    xp?: { base:number, scalingObjective:string, gainObjective?:string, levelObjective?:string, stepPerPoints?:number },
+	 *    title?: { enabled:boolean, source?:string, id?:string, priority?:number, durationTicks?:number, content?:string[] },
+ *  },
+ * }} ModifierRule
+ *
+ * @typedef {{
+ *  id?: string,
+ *  threshold: number,
+ *  drops: DropEntryTuple[],
+ *  effects?: {
+ *    scoreboardAddsOnBreak?: Record<string, number>,
+ *  },
+ * }} FortuneTierEntry
+ *
+ * @typedef {{
+ *  objective: string,
+ *  step: number,
+ *  tiers: FortuneTierEntry[],
+ * }} FortuneTiersConfig
+ *
+ * @typedef {{ enabled?: boolean, pitchJitter?: number }} SpreadSoundConfig
  *
  * @typedef {{
  *  id: string,
@@ -36,8 +64,6 @@
  *  // - array: ["A", "B"]
  *  // - "*" para permitir todas
  *  areas?: string | string[],
- *  // Compat (legacy): oreBlockId (equivalente a blockId exacto)
- *  oreBlockId?: string,
  *  regenSeconds?: number,
  *  minedBlockId?: string,
  *  // Sonidos a reproducir al minar (opcional)
@@ -58,7 +84,30 @@
  *  // - Formato: { "OBJETIVO": numeroAAgregar }
  *  scoreboardAddsOnBreak?: Record<string, number>,
  *  drops: DropEntryTuple[],
- *  modifiers?: Record<string, OreModifier>
+ *  modifiers?: ModifierRule[],
+ *  // Fortune tiers: sistema probabilístico de drops por valor de fortuna.
+ *  // Reemplaza modifiers de rango para fortuna. Cada tier define drops para un umbral.
+ *  // fortune % step = probabilidad de obtener el tier superior (interpolación lineal).
+ *  fortuneTiers?: FortuneTiersConfig,
+ *  // Propagación por bloques adyacentes. También puede reproducir sonido adicional por bloque afectado.
+ *  // randomness: 0..1 altera el orden de exploración para que el patrón sea menos predecible.
+ *  // sound.enabled: reproduce un burst adicional por cada bloque extra afectado.
+ *  // sound.pitchJitter: variación aleatoria del pitch por bloque extra para evitar repetición plana.
+ *  spread?: {
+ *    enabled?: boolean,
+ *    objective?: string,
+ *    pointsPerExtra?: number,
+ *    maxExtraBlocks?: number,
+ *    maxVisitedBlocks?: number,
+ *    matchMode?: string,
+ *    randomness?: number,
+ *    sound?: SpreadSoundConfig,
+ *  },
+ *  // XP de skill (independiente de fortuna). Se aplica siempre que se mine el bloque.
+ *  // Escala con scalingObjective (ej: ExpMinTotalH) pero NO varía por tier de fortuna.
+ *  xp?: { base:number, scalingObjective:string, gainObjective?:string, levelObjective?:string, stepPerPoints?:number },
+ *  // Título de XP (independiente de fortuna). Visual que se muestra al ganar XP.
+ *  xpTitle?: { enabled:boolean, source?:string, id?:string, priority?:number, durationTicks?:number, content?:string[] },
  * }} BlockDefinition
  */
 
@@ -81,6 +130,88 @@ export const skillRegenConfig = {
 		tellPlayer: false,
 		// Traza: manda info del bloque detectado en cada intento de minado dentro de áreas
 		traceBreak: false,
+		// Opcional: filtra trazas por target.
+		// Soporta: "*", "minecraft:carrots", "skill:farming", "def:carrots"
+		traceTargets: [],
+		// Tag visual para mensajes de depuración.
+		tag: "regen",
+	},
+
+	runtime: {
+		grouping: {
+			// Ventana corta para unir bloques adyacentes al mismo grupo local.
+			windowMs: 4000,
+			// Límite de miembros por grupo local de veta.
+			maxMembersPerGroup: 12,
+			// Guardrails por scope (dimension+area+skill+family).
+			maxOpenGroupsPerScope: 40,
+			maxClosedPendingPerScope: 80,
+			maxGroupsPerScopeTotal: 120,
+			// Si no hay jugadores conectados, restaura todos los pendientes inmediatamente.
+			restoreAllWhenNoPlayers: true,
+			// Cadencia de chequeo redundante de jugadores conectados.
+			offlineCheckIntervalTicks: 100,
+		},
+		cropProtection: {
+			// Anti-trample preciso: solo corrige el spot exacto bajo el jugador.
+			enabled: true,
+			// 1 tick para máxima precisión visual; subir si necesitas menos costo.
+			intervalTicks: 1,
+			// Si el pisoteo destruye el cultivo y hay snapshot reciente, restaura su estado exacto.
+			restoreDestroyedCrop: true,
+			// Ventana máxima para considerar válido el snapshot anti-trample (ms).
+			snapshotTtlMs: 1200,
+				// Elimina drops vanilla producidos por pisoteo (ej: carrot suelta al caer sobre crops).
+				suppressVanillaDrops: true,
+				// Ventana corta para suprimir el item generado por trample (ms).
+				dropSuppressTtlMs: 500,
+				// Radio alrededor del spot protegido donde se filtran esos drops.
+				dropSuppressRadius: 1.2,
+				// Lista extra opcional de item ids vanilla a filtrar en trample.
+				blockedVanillaItemIds: [],
+				// Ventana para considerar la huella anterior del jugador (sprint/salto rápido).
+				footTrailTtlMs: 350,
+		},
+		xpOrbs: {
+			maxSpawnPerBreak: 25,
+		},
+		spread: {
+			enabledByDefault: false,
+			pointsPerExtra: 100,
+			maxExtraBlocks: 12,
+			maxVisitedBlocks: 128,
+			matchMode: "same-block-type",
+			randomness: 0.35,
+			sound: {
+				enabledByDefault: true,
+				pitchJitter: 0.08,
+			},
+		},
+		particles: {
+			// Keys de modifiers que disparan particlesOnSilkTouch.
+			triggerModifierKeys: ["silk_touch_1"],
+		},
+		titles: {
+			enabledByDefault: true,
+			source: "regen_xp",
+			priority: 40,
+			durationTicks: 40,
+			// Placeholders soportados:
+			// - ${xpGain}
+			// - ${xpActual}
+			// - ${xpRequeriment} (compat con el naming actual)
+			// - ${xpRequirement} (alias)
+			// - ${xpTotal}
+			// - ${skill}
+			contentTemplate: ["+${xpGain}"],
+			// Fallback visual cuando no hay catálogo de niveles consumible para la skill.
+			noLevelsContentTemplate: ["+${xpGain} (${xpTotal})"],
+			progressObjectivesBySkill: {
+				mining: { xp: "SkillXpMineria", level: "SkillLvlMineria" },
+				foraging: { xp: "SkillXpTala", level: "SkillLvlTala" },
+				farming: { xp: "SkillXpCosecha", level: "SkillLvlCosecha" },
+			},
+		},
 	},
 
 	// Métricas (scoreboard players add)
@@ -122,7 +253,15 @@ export const skillRegenConfig = {
 	// Persistencia (dynamic properties)
 	persistence: {
 		// Key del mundo para guardar pendientes (JSON)
-		key: "atomic3:mining_regen_pending",
+		key: "atomic:mining_regen_pending",
+		// Índice de scopes -> shard key para grupos locales.
+		groupIndexKey: "atomic:regen_groups_index",
+		// Fallback para scopes no registrados en worldInitialize.
+		groupFallbackKey: "atomic:regen_groups_fallback",
+		// Prefijo de shards por scope (dp por scope).
+		groupShardPrefix: "atomic:regen_gs_",
+		// Delay de reintento al fallar restore (ms)
+		retryDelayMs: 2000,
 		// Longitud máxima del string guardado (limita tamaño del JSON).
 		// Si crece mucho, se recorta en runtime para no romper DP.
 		maxStringLength: 30000,
@@ -137,12 +276,14 @@ export const skillRegenConfig = {
 	/** @type {BlockDefinition[]} */
 	blocks: [
 		// MVP: carbón regenerable (skill: mining)
+		
 		{
 			id: "coal",
 			skill: "mining",
-			blockId: "minecraft:coal_ore",
+			blockId: "minecraft:*coal_ore",
 			// Área(s) habilitadas para este bloque
 			areas: ["A"],
+			
 			// Métrica específica: al minar carbón suma 1 al objective CARBON
 			scoreboardAddsOnBreak: {
 				CARBON: 1,
@@ -167,44 +308,74 @@ export const skillRegenConfig = {
 			// minedBlockId opcional: si lo omites usa defaultMinedBlockId
 			// minedBlockId: "minecraft:black_concrete",
 			drops: [
-				// Ejemplo base (sin fortuna): 50% 1-2 carbón
+				// Fallback base (solo si fortuneTiers no aplica): 30% 1-2 carbón
 				[1, "minecraft:coal", 1, 2, 30, "§jCarbón", ["§7Mineral regenerable"]],
-				// Drop extra raro: 10% 1 pepita de hierro (solo para probar  tabla)
 				[2, "minecraft:iron_nugget", 1, 1, 70, "§fPepita", ["§7Drop de prueba"]],
 			],
-			modifiers: {
-				// Silk Touch: reemplaza por el bloque (para comprobar override)
-				silk_touch_1: {
-					match: ["silk touch i", "toque de seda i"],
-					priority: 100,
-					mode: "override",
-					drops: [[1, "minecraft:coal_ore", 1, 1, 100, "§8Carbón (Silk)", ["§7Toque de seda"]]],
-				},
-
-				// Fortuna (override): aumenta cantidades y chance
-				fortune_1: {
-					match: ["fortuna i", "fortune i"],
-					priority: 10,
-					mode: "override",
-					drops: [[1, "minecraft:coal", 1, 3, 65, "§jCarbón", ["§7Fortuna I"]]],
-				},
-				fortune_2: {
-					match: ["fortuna ii", "fortune ii"],
-					priority: 20,
-					mode: "override",
-					drops: [[1, "minecraft:coal", 2, 4, 75, "§jCarbón", ["§7Fortuna II"]]],
-				},
-				fortune_3: {
-					match: ["fortuna iii", "fortune iii"],
-					priority: 30,
-					mode: "override",
-					// Ejemplo: bonus extra SOLO con fortuna III
-					scoreboardAddsOnBreak: {
-						DINERO: 2,
-					},
-					drops: [[1, "minecraft:coal", 2, 6, 85, "§jCarbón", ["§7Fortuna III"]]],
-				},
+			// XP de skill: independiente de fortuna. Escala con ExpMinTotalH.
+			xp: {
+				base: 8,
+				scalingObjective: "ExpMinTotalH",
+				gainObjective: "SkillXpMineria",
+				levelObjective: "SkillLvlMineria",
+				stepPerPoints: 10,
 			},
+			// Título visual de XP: independiente de fortuna.
+			xpTitle: {
+				enabled: true,
+				source: "regen_xp",
+				id: "mining_xp",
+				priority: 40,
+				durationTicks: 40,
+				content: ["§3+${xpGain} ${xpActual}/${xpRequeriment}"],
+			},
+			// Fortune tiers: sistema probabilístico basado en FortMinTotalH.
+			// Solo afecta DROPS y scoreboardAdds por tier. XP/title son block-level.
+			// Cada 100 puntos de fortuna = nuevo tier.
+			// fortune % step = probabilidad de obtener el tier superior.
+			// Ej: 150 fortuna → 50% tier-200, 50% tier-100.
+			fortuneTiers: {
+				objective: "FortMinTotalH",
+				step: 100,
+				tiers: [
+					{
+						id: "FortunaMinera_0",
+						threshold: 0,
+						drops: [[1, "minecraft:coal", 1, 3, 65, "§jCarbón", ["§7Fortuna Minera 0"]]],
+					},
+					{
+						id: "FortunaMinera_1",
+						threshold: 100,
+						drops: [[1, "minecraft:coal", 2, 6, 85, "§jCarbón", ["§7Fortuna Minera I"]]],
+						effects: {
+							scoreboardAddsOnBreak: { DINERO: 2 },
+						},
+					},
+					{
+						id: "FortunaMinera_2",
+						threshold: 200,
+						drops: [
+							[1, "minecraft:coal", 4, 8, 90, "§jCarbón", ["§7Fortuna Minera II"]],
+							[2, "minecraft:iron_nugget", 1, 1, 30, "§fPepita", ["§7Fortuna Minera II"]],
+						],
+						effects: {
+							scoreboardAddsOnBreak: { DINERO: 4 },
+						},
+					},
+				],
+			},
+			spread: {
+				enabled: false,
+				randomness: 0.2,
+				sound: {
+					enabled: true,
+					pitchJitter: 0.04,
+				},
+				// objective futuro sugerido para cuando exista la stat de expansión minera.
+				// objective: "FrenMinTotalH",
+			},
+			// Modifiers vacío: reservado para overrides especiales (ej: silk touch)
+			modifiers: [],
 		}
 		,
 		// TEST: tronco de roble (skill: foraging)
@@ -212,7 +383,20 @@ export const skillRegenConfig = {
 			id: "oak log",
 			skill: "foraging",
 			blockId: "minecraft:oak_log",
-			areas: ["B"],
+			areas: ["A", "B"],
+			spread: {
+				enabled: true,
+				objective: "FrenTalTotalH",
+				pointsPerExtra: 100,
+				maxExtraBlocks: 16,
+				maxVisitedBlocks: 196,
+				matchMode: "same-block-type",
+				randomness: 0.45,
+				sound: {
+					enabled: true,
+					pitchJitter: 0.1,
+				},
+			},
 			// mined-state específico para este bloque
 			minedBlockId: "minecraft:brown_terracotta",
 			regenSeconds: 15,
@@ -220,29 +404,43 @@ export const skillRegenConfig = {
 			scoreboardAddsOnBreak: {
 				TRONCOS: 1,
 			},
+			xp: {
+				base: 8,
+				scalingObjective: "ExpTalTotalH",
+				gainObjective: "SkillXpTala",
+				levelObjective: "SkillLvlTala",
+				stepPerPoints: 10,
+			},
+			xpTitle: {
+				enabled: true,
+				source: "regen_xp",
+				id: "foraging_xp",
+				priority: 40,
+				durationTicks: 40,
+				content: ["§3+${xpGain} ${xpActual}/${xpRequeriment}"],
+			},
 			drops: [
 				[1, "minecraft:oak_log", 1, 1, 50, "MaderaTest", ["Madera."]],
 				[2, "minecraft:oak_leaves", 1, 3, 33, "Hojitas", ["hojita :D"]],
 			],
-			modifiers: {
-				// Silk Touch: para testear override
-				silk_touch_1: {
-					match: ["silk touch i", "toque de seda i"],
-					priority: 100,
-					mode: "override",
-					drops: [[1, "minecraft:oak_log", 1, 1, 100, "MaderaTest (Silk)", ["§7Test: Silk Touch"]]],
-				},
-				// Fortuna: para testear otra tabla
-				fortune_1: {
-					match: ["fortuna i", "fortune i"],
+			modifiers: [
+				{
+					id: "FortunaTala_A",
 					priority: 10,
 					mode: "override",
-					drops: [
-						[1, "minecraft:oak_log", 1, 2, 65, "MaderaTest", ["§7Test: Fortune I"]],
-						[2, "minecraft:oak_leaves", 1, 4, 40, "Hojitas", ["§7Test: Fortune I"]],
-					],
+					when: {
+						all: [
+							{ score: { objective: "FortTalTotalH", range: { min: 10, max: 120 } } },
+						],
+					},
+					effects: {
+						drops: [
+							[1, "minecraft:oak_log", 1, 2, 65, "MaderaTest", ["§7Fortuna Tala A"]],
+							[2, "minecraft:oak_leaves", 1, 4, 40, "Hojitas", ["§7Fortuna Tala A"]],
+						],
+					},
 				},
-			},
+			],
 		},
 
 		// TEST: cultivo de zanahoria (skill: farming)
@@ -251,35 +449,75 @@ export const skillRegenConfig = {
 			skill: "farming",
 			blockId: "minecraft:carrots",
 			areas: ["A", "B"],
-			// mined-state específico: queremos que quede vacío mientras regenera
-			// Si por versión `minecraft:air` no se puede setear, usa "minecraft:structure_void".
+			// Fallback legacy para bloques sin ciclo de crecimiento.
 			minedBlockId: "minecraft:air",
+			growthCycle: {
+				// Solo cosecha completa cuando growth >= matureValue.
+				state: "growth",
+				matureValue: 7,
+				// Estado temporal tras cosecha exitosa.
+				seedValue: 0,
+				// Si rompen el cultivo inmaduro, se restaura al instante y no se persiste.
+				instantRestoreImmature: true,
+			},
 			regenSeconds: 12,
 			sounds: [{ id: "dig.grass", volume: 0.8, pitch: 1.1 }],
+			spread: {
+				enabled: false,
+				randomness: 0.3,
+				sound: {
+					enabled: true,
+					pitchJitter: 0.06,
+				},
+				// objective futuro sugerido para cuando exista la stat de expansión de cosecha.
+				// objective: "FrenCosTotalH",
+			},
 			scoreboardAddsOnBreak: {
 				ZANAHORIAS: 1,
+			},
+			xp: {
+				base: 4,
+				scalingObjective: "ExpCosTotalH",
+				gainObjective: "SkillXpCosecha",
+				levelObjective: "SkillLvlCosecha",
+				stepPerPoints: 10,
+			},
+			xpTitle: {
+				enabled: true,
+				source: "regen_xp",
+				id: "farming_xp",
+				priority: 40,
+				durationTicks: 40,
+				content: ["§3+${xpGain} ${xpActual}/${xpRequeriment}"],
+			},
+			mutation: {
+				enabled: true,
+				objective: "MutActTotalH",
+				scoreMax: 1000,
+				drops: [
+					[90, "minecraft:carrot", 1, 1, 100, "§dZanahoria mutada", ["§5Mutación activa"]],
+				],
 			},
 			// Sin xpOrbs (omitido a propósito)
 			drops: [
 				[1, "minecraft:carrot", 1, 3, 80, "Zanahoria", ["§7Test crop"]],
 				[2, "minecraft:bone_meal", 1, 1, 15, "Fertilizante", ["§7Test crop"]],
 			],
-			modifiers: {
-				// "Cosecha I": modo add para testear stacking
-				harvest_1: {
-					match: ["cosecha i", "harvest i"],
+			modifiers: [
+				{
+					id: "FortunaCosecha_A",
 					priority: 10,
 					mode: "add",
-					drops: [[99, "minecraft:carrot", 1, 1, 100, "Bonus", ["§7Test: +1"]]],
+					when: {
+						all: [
+							{ score: { objective: "FortCosTotalH", range: { min: 10, max: 200 } } },
+						],
+					},
+					effects: {
+						drops: [[99, "minecraft:carrot", 1, 1, 100, "Bonus", ["§7Fortuna Cosecha A"]]],
+					},
 				},
-				// Silk Touch: override (solo test)
-				silk_touch_1: {
-					match: ["silk touch i", "toque de seda i"],
-					priority: 100,
-					mode: "override",
-					drops: [[1, "minecraft:carrot", 1, 1, 100, "Zanahoria (Silk)", ["§7Test: Silk Touch"]]],
-				},
-			},
+			],
 		},
 	],
 };

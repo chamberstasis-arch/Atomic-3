@@ -40,7 +40,7 @@ function playEffectSoundBestEffort(player, soundDef) {
 		// 3) Command fallback
 		try {
 			if (!isSafeCommandToken(id)) return;
-			player?.runCommandAsync?.(`playsound ${id} @s ~~~ ${volC} ${pitC}`);
+			player?.runCommand?.(`playsound ${id} @s ~~~ ${volC} ${pitC}`);
 		} catch (e) {
 			void e;
 		}
@@ -67,7 +67,7 @@ function applySymbolicDamageBestEffort(player, amountInt) {
 
 		// 2) Fallback: command (camera/hurt feedback)
 		try {
-			player.runCommandAsync?.(`damage @s ${amt}`);
+			player.runCommand?.(`damage @s ${amt}`);
 		} catch (e) {
 			void e;
 		}
@@ -183,7 +183,7 @@ export function processEffectsTick(world, config, tickCounter) {
 
 		if (!doDecrement && !doTick18 && !doTick25) return;
 
-		const players = world.getAllPlayers();
+		const players = world.getPlayers();
 		for (const player of players) {
 			if (!player || !player.isValid) continue;
 			if (!hasHEnabled(player)) continue;

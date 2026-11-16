@@ -37,8 +37,8 @@ Motivo:
 ## 1) Inicializadores existentes (JS)
 
 ### AntiCheat (centralizado)
-- Init: [Atomic BP/scripts/features/anticheat/core/scoreboardsInit.js](Atomic%20BP/scripts/features/anticheat/core/scoreboardsInit.js)
-- Estado: **call comentado** en [Atomic BP/scripts/features/anticheat/index.js](Atomic%20BP/scripts/features/anticheat/index.js)
+- Init: [Atomic BP/scripts/scoreboards/init.js](Atomic%20BP/scripts/scoreboards/init.js)
+- Estado: creado desde el catálogo central antes de iniciar las lecturas runtime.
 - Objectives creados:
   - `ac_feature_flags`
   - `advertencias`
@@ -131,9 +131,9 @@ Motivo:
 
 ---
 
-## 3) Scoreboards usados en documentación/archivements
+## 3) Scoreboards usados por achievements
 
-Fuente: [Atomic BP/scripts/features/archivements/arch-list/LOGROS.md](Atomic%20BP/scripts/features/archivements/arch-list/LOGROS.md)
+Fuente: [Atomic BP/scripts/features/achievements/config.js](Atomic%20BP/scripts/features/achievements/config.js)
 
 Requeridos (según reglas de logros):
 - `segundos`, `minutos`, `horas`, `dias`
@@ -193,7 +193,7 @@ Estos objetivos se agregan por **config** y se deben crear si se habilita el fea
 **Spawnpoints (spawnpoints system)**
 - `spawnpoint`
 
-**Archivements (LOGROS)**
+**Achievements (LOGROS)**
 - `mobs`, `muertes`, `Parcela`, `Corazones`
 - `Logros` (contador total por jugador)
 - `Logro_<id>` (one-time por logro)

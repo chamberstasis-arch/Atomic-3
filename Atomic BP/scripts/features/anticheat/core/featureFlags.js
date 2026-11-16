@@ -10,8 +10,8 @@ import { system, world } from "@minecraft/server";
 import { runInOverworld, quoteForCommand } from "./commandsRunner.js";
 import { getObjectiveFromConfig, getObjectiveNameFromConfig } from "./scoreboardStore.js";
 
-const AC_ENABLED_KEY = "atomic3:ac_enabled";
-const BAN_KICK_ENABLED_KEY = "atomic3:ac_ban_kick_enabled";
+const AC_ENABLED_KEY = "atomic:ac_enabled";
+const BAN_KICK_ENABLED_KEY = "atomic:ac_ban_kick_enabled";
 
 const SB_AC_ENABLED = "ac_enabled";
 const SB_BAN_KICK_ENABLED = "ac_ban_kick_enabled";
@@ -94,7 +94,7 @@ function scheduleWorldLoadRetry(options) {
 	try {
 		if (world && world.afterEvents && world.afterEvents.worldLoad && typeof world.afterEvents.worldLoad.subscribe === "function") {
 			world.afterEvents.worldLoad.subscribe(() => {
-				// Orden: scoreboardsInit crea objectives en worldLoad; nosotros reintentamos en el siguiente tick.
+				// Orden: scripts/scoreboards/init.js crea objectives en worldLoad; nosotros reintentamos en el siguiente tick.
 				try {
 					system.run(() => {
 						try {

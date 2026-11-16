@@ -246,7 +246,7 @@ export const abnormalStacksCheck = {
 		const everyTicks = Math.max(5, Number(cfg && cfg.checkEveryTicks != null ? cfg.checkEveryTicks : 20));
 
 		system.runInterval(() => {
-			for (const player of world.getAllPlayers()) {
+			for (const player of world.getPlayers()) {
 				try {
 					scanAndFixPlayer(ctx, player, cfg);
 				} catch (e) {

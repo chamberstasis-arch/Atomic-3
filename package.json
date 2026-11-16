@@ -1,0 +1,13 @@
+{
+  "name": "atomic-addon",
+  "private": true,
+  "type": "module",
+  "description": "Atomic - Behavior Pack + Resource Pack para Minecraft Bedrock",
+  "scripts": {
+    "check": "node dev/check-pack.mjs"
+  },
+  "devDependencies": {
+    "@minecraft/server": "2.4.0",
+    "@minecraft/server-ui": "2.0.0"
+  }
+}

@@ -33,7 +33,7 @@ function tellSelf(player, message) {
 		void e;
 	}
 
-	// Fallback: tellraw (best-effort). Ojo: runCommandAsync puede fallar sin throw (Promise reject).
+	// Fallback: tellraw (best-effort). Ojo: runCommand puede fallar sin throw (Promise reject).
 	try {
 		const payload = JSON.stringify({ rawtext: [{ text: msg }] });
 		runAsPlayer(player, `tellraw @s ${payload}`);
@@ -168,7 +168,7 @@ function unbanByName(config, playerName) {
 	const storage = config && config.storage ? config.storage : {};
 	const sb = storage.scoreboards ? storage.scoreboards : {};
 	// Importante: este módulo NO crea objectives.
-	// Asume que ya existen (creados por core/scoreboardsInit.js post-worldLoad).
+	// Asume que ya existen (creados por scripts/scoreboards/init.js post-worldLoad).
 	const banUntilName = getObjectiveNameFromConfig(sb.banUntil, "ac_ban_until");
 	const banSanctionName = getObjectiveNameFromConfig(sb.banSanction, "ac_ban_sanction");
 	const banSecondsName = getObjectiveNameFromConfig(sb.banSeconds, "ac_ban_seconds");

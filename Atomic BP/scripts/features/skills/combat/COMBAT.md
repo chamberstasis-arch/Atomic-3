@@ -496,3 +496,121 @@ Si un mob coincide con una entrada de `mobXp`, solo se aplica la primera coincid
 ### 10.5 No romper módulos existentes
 
 Los módulos `calc/`, `health/`, `damage_dealt/`, `damage_title/`, `damageCancel/` y `effects/` no se modifican estructuralmente. El único cambio en código existente es agregar el hook de notificación en `damage_dealt/byplayer/index.js` (una línea).
+
+---
+
+## 11. Sistema de spawns por área
+
+> Implementado en `combat/spawns/`. Documento detallado: [SPAWNS.md](./SPAWNS.md).
+
+### 11.1 Decisión de diseño
+
+Se implementó la **Opción B (scripts puros)** como base para el spawning de mobs. Los mobs se generan dinámicamente desde templates declarados en `config.js`, sin depender de structures ni setup manual in-game.
+
+### 11.2 Archivos creados
+
+| Archivo | Responsabilidad |
+|---|---|
+| `spawns/validator.js` | Validación de posiciones: bloque sólido, espacio aéreo, dentro de área, búsqueda de Y válida |
+| `spawns/population.js` | Conteo de mobs por zona (tags), despawn por distancia, limpieza periódica |
+| `spawns/spawner.js` | Selección ponderada de templates, instanciación de mobs con equipamiento/tags |
+| `spawns/index.js` | Orquestador: loop de spawn + cleanup via `system.runInterval`, condiciones por zona, debug |
+
+### 11.3 Configuración — Templates de mobs
+
+`config.mobs.templates` pasó de `[]` a un **objeto de templates** con IDs como claves:
+
+```js
+mobs: {
+  templates: {
+    guerrero_corrupto: {
+      typeId: "minecraft:zombie",
+      nameTag: "§cGuerrero Corrupto",
+      weight: 10,
+      equipment: { head: { typeId: "minecraft:iron_helmet" }, ... },
+    },
+    // ...más templates
+  },
+},
+```
+
+### 11.4 Configuración — Zonas de spawn
+
+Nuevo bloque `spawns` en config con zonas definidas por bounding box:
+
+```js
+spawns: {
+  enabled: true,
+  dimensionId: "minecraft:overworld",
+  spawnTickInterval: 60,
+  despawnDistance: 128,
+  zones: [
+    {
+      id: "zona_entrenamiento_1",
+      area: { min: { x, y, z }, max: { x, y, z } },
+      templatePool: ["guerrero_corrupto", "arquero_maldito"],
+      maxPopulation: 8,
+      conditions: { requirePlayersNearby: true, activationRadius: 64, timeOfDay: "any" },
+    },
+  ],
+},
+```
+
+### 11.5 Tracking y despawn
+
+- Cada mob spawneado recibe el tag `atomic_spawned_{zoneId}`.
+- `population.js` cuenta mobs vivos por zona usando `dimension.getEntities({ tags: [...] })`.
+- Mobs se despawnean si ningún jugador está dentro de `despawnDistance`.
+- Mobs con tag `atomic_persistent` no se despawnean.
+
+### 11.6 Integración
+
+`initCombatSpawns(cfg)` se invoca desde `combat/index.js` junto a `initCombatXp` e `initCombatLoot`. El spawn loop solo arranca si `spawns.enabled === true` y hay al menos una zona configurada.
+
+### 11.7 Debug
+
+Script event `atomic:spawns_debug` muestra estado de todas las zonas (población actual/máxima, enabled).
+
+---
+
+## 12. Estado de implementación
+
+> Actualizado: 2026-03-25
+
+| Componente | Estado | Archivos |
+|---|---|---|
+| `config.js` | ✅ Completo | Niveles, XP, loot, templates, spawns, runtime |
+| `index.js` | ✅ Completo | Bootstrap, registro en core/, init de XP + loot + spawns |
+| `match.js` | ✅ Completo | Motor de matching puro con especificidad |
+| `xp.js` | ✅ Completo | XP por kill con multiplicadores de lore |
+| `loot.js` | ✅ Completo | Drops custom con supresión vanilla reactiva |
+| Hook de kill | ✅ Completo | Pub/sub en `damage_dealt/byplayer/index.js` |
+| Scoreboards | ✅ Registrados | `SkillXpCombate`, `SkillLvlCombate` en `catalog.js` |
+| `spawns/validator.js` | ✅ Completo | Validación de posición, búsqueda de Y |
+| `spawns/population.js` | ✅ Completo | Conteo por zona, despawn por distancia |
+| `spawns/spawner.js` | ✅ Completo | Selección ponderada, instanciación con equipamiento |
+| `spawns/index.js` | ✅ Completo | Loop de spawn/cleanup, condiciones, debug |
+
+### 12.1 Estructura final de `combat/`
+
+```text
+combat/
+  COMBAT.md           ← Este documento
+  SPAWNS.md           ← Documento de diseño del sistema de spawns
+  config.js           ← Config declarativa (niveles, XP, loot, templates, spawns)
+  index.js            ← Bootstrap: initSkillCombat() → core + xp + loot + spawns
+  match.js            ← Motor de matching puro (compartido por xp + loot)
+  xp.js               ← XP por kill
+  loot.js             ← Drops custom por kill
+  spawns/
+    index.js          ← Orquestador de spawn loop + cleanup loop
+    validator.js      ← Validación de posiciones de spawn
+    population.js     ← Tracking de población por zona (tags)
+    spawner.js        ← Instanciación de mobs desde templates
+  calc/               ← (existente, sin cambios)
+  health/             ← (existente, sin cambios)
+  damage_dealt/       ← (existente, hook de kill agregado)
+  damage_title/       ← (existente, sin cambios)
+  damageCancel/       ← (existente, sin cambios)
+  effects/            ← (existente, sin cambios)
+```

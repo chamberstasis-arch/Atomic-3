@@ -3,8 +3,8 @@ import { NAMESPACE } from "../../shared/namespace.js";
 export const customItemsConfig = {
 	NAMESPACE,
 	defaults: {
-		displayName: "test",
-		lore: ["test"],
+		displayName: "",
+		lore: [],
 	},
 	items: {
 		wooden_pickaxe_plain: {

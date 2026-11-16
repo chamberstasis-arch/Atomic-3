@@ -21,7 +21,7 @@ export function computeDefenseMitigation(cfg, danoBase, defensa, armorPenetratio
 	if (base <= 0) return 0;
 
 	const f = cfg?.formula ?? defenseCalcConfig.formula;
-	const baseConstant = toNumberOr(f.baseConstant, 75);
+	const baseConstant = Math.max(1, toNumberOr(f.baseConstant, 75));
 
 	// Penetración: reduce la defensa efectiva
 	let def = toNumberOr(defensa, 0);

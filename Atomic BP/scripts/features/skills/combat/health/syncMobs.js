@@ -1,9 +1,12 @@
 import { system } from "@minecraft/server";
+import { combatSkillConfig } from "../config.js";
+import { buildTemplateIdentityTag, enforceTemplateEquipmentBestEffort } from "../spawns/spawner.js";
 import { OBJ_VIDA, OBJ_VIDA_MAX, getScoreBestEffort, isHEnabled, setScoreBestEffort } from "./scoreboards.js";
 import { defaultVidaMaxForEntity } from "./defaults.js";
 
 /** @type {Set<any>} */
 const trackedMobs = new Set();
+const templateIdentityCache = new WeakMap();
 
 function getEntityKey(entity) {
 	try {
@@ -71,7 +74,7 @@ function killEntityBestEffort(entity) {
 		void e;
 	}
 	try {
-		entity.runCommandAsync?.("kill @s");
+		entity.runCommand?.("kill @s");
 	} catch (e) {
 		void e;
 	}
@@ -131,6 +134,42 @@ function applyMobVanillaHealthBestEffort(hc, target) {
 	}
 }
 
+function getTemplateIdentityMap(config) {
+	const cfg = config && typeof config === "object" ? config : combatSkillConfig;
+	const cached = templateIdentityCache.get(cfg);
+	if (cached) return cached;
+
+	const templates = cfg?.mobs?.templates ?? {};
+	const byTag = new Map();
+	for (const [templateId, template] of Object.entries(templates)) {
+		const tag = buildTemplateIdentityTag(templateId);
+		if (!tag) continue;
+		byTag.set(tag, { templateId, template });
+	}
+
+	const built = { byTag };
+	templateIdentityCache.set(cfg, built);
+	return built;
+}
+
+function resolveTrackedTemplate(entity, config) {
+	if (!entity) return null;
+	const { byTag } = getTemplateIdentityMap(config);
+	if (byTag.size === 0) return null;
+
+	try {
+		const tags = entity.getTags?.() ?? [];
+		for (const tag of tags) {
+			const entry = byTag.get(tag);
+			if (entry) return entry;
+		}
+	} catch (e) {
+		void e;
+	}
+
+	return null;
+}
+
 export function syncMobs(world, config = undefined) {
 	try {
 		// 1) Refrescar/integrar mobs del set tracked
@@ -163,6 +202,14 @@ export function syncMobs(world, config = undefined) {
 					if (Math.abs(mh.cur - targetHp) >= 0.0001) {
 						applyMobVanillaHealthBestEffort(mh.hc, targetHp);
 					}
+				}
+
+				const trackedTemplate = resolveTrackedTemplate(entity, config);
+				if (trackedTemplate?.template) {
+					enforceTemplateEquipmentBestEffort(entity, trackedTemplate.template.equipment, {
+						clearUnexpected: true,
+						verbose: false,
+					});
 				}
 			} catch (e) {
 				void e;

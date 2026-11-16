@@ -43,7 +43,7 @@ function ensureSkillRuntime(skillId) {
 		if (!controller || controller.token !== token) return;
 		const liveDefinition = getRegisteredSkillDefinition(id);
 		if (!liveDefinition) return;
-		for (const player of world.getAllPlayers()) {
+		for (const player of world.getPlayers()) {
 			reconcileSkillForDefinition(liveDefinition, player, "interval");
 		}
 	}, definition.reconcileEveryTicks);

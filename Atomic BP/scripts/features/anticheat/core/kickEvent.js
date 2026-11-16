@@ -6,7 +6,7 @@
 //
 // Importante:
 // - Este módulo NO crea scoreboards objectives.
-// - Asume que los objectives ya existen (creados por core/scoreboardsInit.js post-worldLoad).
+// - Asume que los objectives ya existen (creados por scripts/scoreboards/init.js post-worldLoad).
 
 import { system, world } from "@minecraft/server";
 
@@ -15,8 +15,8 @@ import { getPlayerScore, setPlayerScore, INT32_MAX } from "./scoreboardStore.js"
 import { isBanKickEnabled } from "./featureFlags.js";
 
 // Legacy (migración): antes se usaban dynamic properties.
-export const BAN_UNTIL_KEY = "atomic3:ac_ban_until";
-export const BAN_REASON_KEY = "atomic3:ac_ban_reason";
+export const BAN_UNTIL_KEY = "atomic:ac_ban_until";
+export const BAN_REASON_KEY = "atomic:ac_ban_reason";
 
 let didSubscribe = false;
 

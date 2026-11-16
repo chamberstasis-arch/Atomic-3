@@ -68,5 +68,5 @@ initOnJoinFirstTime(onJoinFirstTimeConfig);
 initInventorySaves({
     slots: 10,
     loopTicks: 5,
-    keyPrefix: "atomic3:inv:"
+    keyPrefix: "atomic:inv:"
 });

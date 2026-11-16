@@ -141,7 +141,7 @@ export function createSanctionsManager(options) {
 	let scheduled = false;
 	try {
 		if (world && world.afterEvents && world.afterEvents.worldLoad && typeof world.afterEvents.worldLoad.subscribe === "function") {
-			// Orden: scoreboardsInit crea objectives en worldLoad; nosotros leemos en el siguiente tick.
+			// Orden: scripts/scoreboards/init.js crea objectives en worldLoad; nosotros leemos en el siguiente tick.
 			world.afterEvents.worldLoad.subscribe(() => {
 				try {
 					system.run(() => refreshObjectives());

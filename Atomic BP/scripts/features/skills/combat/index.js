@@ -8,6 +8,7 @@ import {
 import { combatSkillConfig } from "./config.js";
 import { initCombatXp } from "./xp.js";
 import { initCombatLoot } from "./loot.js";
+import { initCombatSpawns } from "./spawns/index.js";
 
 let didInit = false;
 
@@ -115,4 +116,5 @@ export function initSkillCombat(userConfig = undefined) {
 	registerSkillDefinition("combat", buildCombatSkillDefinition(cfg));
 	initCombatXp(cfg);
 	initCombatLoot(cfg);
+	initCombatSpawns(cfg);
 }

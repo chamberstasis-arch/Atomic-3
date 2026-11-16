@@ -31,7 +31,7 @@ function playerHasTag(player, tag) {
 function tryForceSurvival(player) {
 	// Mejor esfuerzo. Si no se puede, solo quedará el warning.
 	try {
-		if (player && typeof player.setGameMode === "function") player.setGameMode(GameMode.survival);
+		if (player && typeof player.setGameMode === "function") player.setGameMode(GameMode.Survival);
 		return true;
 	} catch (e) {
 		void e;
@@ -39,7 +39,7 @@ function tryForceSurvival(player) {
 	}
 
 	try {
-		if (player && typeof player.runCommandAsync === "function") player.runCommandAsync("gamemode s");
+		if (player && typeof player.runCommand === "function") player.runCommand("gamemode s");
 		return true;
 	} catch (e) {
 		void e;
@@ -64,7 +64,7 @@ export const adminAllowlistCheck = {
 		const everyTicks = Math.max(5, Number(gmCfg && gmCfg.checkEveryTicks != null ? gmCfg.checkEveryTicks : 20));
 
 		system.runInterval(() => {
-			for (const player of world.getAllPlayers()) {
+			for (const player of world.getPlayers()) {
 				let gm;
 				try {
 					gm = player && typeof player.getGameMode === "function" ? player.getGameMode() : undefined;
@@ -73,8 +73,11 @@ export const adminAllowlistCheck = {
 					gm = undefined;
 				}
 
-				const isCreative = gm === GameMode.creative;
-				const isSpectator = gm === GameMode.spectator;
+				// Scripting V2: los miembros del enum son PascalCase (GameMode.Creative === "Creative").
+				// Se compara sin distinguir mayúsculas para tolerar ambos formatos.
+				const gmName = gm == null ? "" : String(gm).toLowerCase();
+				const isCreative = gmName === "creative";
+				const isSpectator = gmName === "spectator";
 				if ((!denyCreative || !isCreative) && (!denySpectator || !isSpectator)) continue;
 
 				const allowed = isOperator(player) || playerHasTag(player, exceptionTag);

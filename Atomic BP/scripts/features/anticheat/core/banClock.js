@@ -7,7 +7,7 @@
 //
 // Importante:
 // - Este módulo NO crea objectives.
-// - Asume que los objectives ya existen (creados por core/scoreboardsInit.js post-worldLoad).
+// - Asume que los objectives ya existen (creados por scripts/scoreboards/init.js post-worldLoad).
 
 import { system, world } from "@minecraft/server";
 import { getPlayerScore, setPlayerScore, INT32_MAX } from "./scoreboardStore.js";
@@ -92,7 +92,7 @@ export function initBanClock(options) {
 	try {
 		if (world && world.afterEvents && world.afterEvents.worldLoad && typeof world.afterEvents.worldLoad.subscribe === "function") {
 			world.afterEvents.worldLoad.subscribe(() => {
-				// Orden: scoreboardsInit crea objectives en worldLoad; actualizar en el siguiente tick.
+				// Orden: scripts/scoreboards/init.js crea objectives en worldLoad; actualizar en el siguiente tick.
 				try {
 					system.run(() => {
 						tick();

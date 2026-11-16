@@ -171,7 +171,7 @@ export const anticheatConfig = {
 	},
 
 	// 3) Detección de encantamientos ilegales
-	illegalEnchantments: {
+	illegalEnchants: {
 		enabled: true,
 	},
 

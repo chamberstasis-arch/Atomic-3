@@ -459,8 +459,8 @@ function emitLevelChangeSound(player, sound) {
 			dim.playSound(resolved.id, loc, { volume: resolved.volume, pitch: resolved.pitch });
 			return;
 		}
-		if (typeof player.runCommandAsync === "function" && isSafeCommandToken(resolved.id)) {
-			player.runCommandAsync(`playsound ${resolved.id} @s ~~~ ${resolved.volume} ${resolved.pitch}`);
+		if (typeof player.runCommand === "function" && isSafeCommandToken(resolved.id)) {
+			player.runCommand(`playsound ${resolved.id} @s ~~~ ${resolved.volume} ${resolved.pitch}`);
 		}
 	} catch (e) {
 		void e;
@@ -484,8 +484,8 @@ function emitLevelChangeParticles(player, particle) {
 			for (let i = 0; i < resolved.count; i++) dim.spawnParticle(resolved.id, spawnAt);
 			return;
 		}
-		if (typeof player.runCommandAsync === "function" && isSafeCommandToken(resolved.id)) {
-			for (let i = 0; i < resolved.count; i++) player.runCommandAsync(`particle ${resolved.id} ~~~`);
+		if (typeof player.runCommand === "function" && isSafeCommandToken(resolved.id)) {
+			for (let i = 0; i < resolved.count; i++) player.runCommand(`particle ${resolved.id} ~~~`);
 		}
 	} catch (e) {
 		void e;

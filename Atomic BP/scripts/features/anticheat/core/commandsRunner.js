@@ -20,7 +20,7 @@ export function runInOverworld(command) {
 	const dim = getOverworld();
 	if (!dim) return false;
 	try {
-		dim.runCommandAsync(String(command));
+		dim.runCommand(String(command));
 		return true;
 	} catch (e) {
 		void e;
@@ -30,8 +30,8 @@ export function runInOverworld(command) {
 
 export function runAsPlayer(player, command) {
 	try {
-		if (player && typeof player.runCommandAsync === "function") {
-			player.runCommandAsync(String(command));
+		if (player && typeof player.runCommand === "function") {
+			player.runCommand(String(command));
 			return true;
 		}
 		return false;

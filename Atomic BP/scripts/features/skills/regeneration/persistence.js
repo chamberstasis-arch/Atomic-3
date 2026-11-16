@@ -48,10 +48,10 @@ function toInt(value, fallback = 0) {
 
 function getPersistenceConfig(config) {
 	const persistence = config?.persistence ?? {};
-	const legacyKey = asStr(persistence.key) || "atomic3:mining_regen_pending";
-	const indexKey = asStr(persistence.groupIndexKey) || "atomic3:regen_groups_index";
-	const fallbackKey = asStr(persistence.groupFallbackKey) || "atomic3:regen_groups_fallback";
-	const shardPrefix = asStr(persistence.groupShardPrefix) || "atomic3:regen_gs_";
+	const legacyKey = asStr(persistence.key) || "atomic:mining_regen_pending";
+	const indexKey = asStr(persistence.groupIndexKey) || "atomic:regen_groups_index";
+	const fallbackKey = asStr(persistence.groupFallbackKey) || "atomic:regen_groups_fallback";
+	const shardPrefix = asStr(persistence.groupShardPrefix) || "atomic:regen_gs_";
 	const maxLen = Math.max(1000, toInt(persistence.maxStringLength, 30000));
 	const maxEntries = Math.max(1, toInt(persistence.maxEntries, 1500));
 	const loadBatchSize = Math.max(1, toInt(persistence.loadBatchSize, 50));

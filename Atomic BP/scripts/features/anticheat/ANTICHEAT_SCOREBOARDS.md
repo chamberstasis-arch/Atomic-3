@@ -3,7 +3,7 @@
 Este Behavior Pack usa scoreboards como almacenamiento **best-effort** (cuando Dynamic Properties no están disponibles o no son fiables).
 
 La inicialización centralizada se hace en:
-- [scripts/features/anticheat/core/scoreboardsInit.js](scripts/features/anticheat/core/scoreboardsInit.js)
+- [scripts/scoreboards/init.js](../../scoreboards/init.js)
 
 > Importante: los objectives se crean **después de `worldLoad`** para evitar fallos en entornos donde el mundo todavía no está listo.
 

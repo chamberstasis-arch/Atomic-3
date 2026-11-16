@@ -16,7 +16,7 @@ function removeTitleBestEffort(entity) {
 	}
 	try {
 		// Ultimo recurso
-		entity?.runCommandAsync?.("kill @s");
+		entity?.runCommand?.("kill @s");
 	} catch (e) {
 		void e;
 	}

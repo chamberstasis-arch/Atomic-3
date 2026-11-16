@@ -300,14 +300,14 @@ function applyScoreboardAddsBestEffort(config, dimension, player, addsObj) {
 			}
 
 			// Fallback: comando (puede requerir cheats habilitados)
-			if (!dimension || typeof dimension.runCommandAsync !== "function" || !player.name) continue;
+			if (!dimension || typeof dimension.runCommand !== "function" || !player.name) continue;
 			if (!isSafeCommandToken(objective)) {
 				if (debugEnabled(config)) dbg(config, `scoreboard: objective '${objective}' inválido para fallback command (skip)`);
 				continue;
 			}
 			const target = quoteForCommand(player.name);
 			const cmd = `scoreboard players add ${target} ${objective} ${Math.trunc(delta)}`;
-			dimension.runCommandAsync(cmd);
+			dimension.runCommand(cmd);
 		} catch (e) {
 			void e;
 		}
@@ -990,7 +990,7 @@ function playMineSoundBestEffort(config, player, dimension, pos, oreDef, traceTo
 			const loc = { x: pos.x + 0.5, y: pos.y + 0.5, z: pos.z + 0.5 };
 			const canPlayer = player && typeof player.playSound === "function";
 			const canDim = dimension && typeof dimension.playSound === "function";
-			const canCmd = dimension && typeof dimension.runCommandAsync === "function";
+			const canCmd = dimension && typeof dimension.runCommand === "function";
 
 			let played = 0;
 			let via = canPlayer ? "player.playSound" : canDim ? "dimension.playSound" : canCmd ? "command" : "none";
@@ -1023,7 +1023,7 @@ function playMineSoundBestEffort(config, player, dimension, pos, oreDef, traceTo
 						const fallbackTarget = `@p[x=${pos.x},y=${pos.y},z=${pos.z},r=8]`;
 						const target = targetByName || fallbackTarget;
 						const cmd = `playsound ${id} ${target} ${pos.x} ${pos.y} ${pos.z} ${volC} ${pitC} 0.2`;
-						dimension.runCommandAsync(cmd);
+						dimension.runCommand(cmd);
 						played++;
 						if (debugEnabled(config)) dbg(config, `sound: ok id=${id} via=command v=${volC} p=${pitC}`);
 					}
@@ -1179,7 +1179,7 @@ function isCreativeBestEffort(player) {
 			const gmStr = gm != null ? String(gm).toLowerCase() : "";
 
 			// En 2.4.0 el enum es PascalCase: GameMode.Creative (value: "Creative")
-			const creativeEnum = (GameMode && (GameMode.Creative ?? GameMode.creative)) || null;
+			const creativeEnum = (GameMode && GameMode.Creative) || null;
 			if (creativeEnum != null && gm === creativeEnum) return true;
 			return gmStr === "creative";
 		}

@@ -1,7 +1,24 @@
+# Packs de referencia y muestras externas (pesados, no son parte del add-on)
 vanilla-packs/
 bedrock-samples/
+
+# Herramientas, scripts y respaldos locales (no pertenecen al add-on)
 tools/
-package-lock.json
-package.json
+*-respaldo-*/
+NOTAS_ENTORNO_LOCAL.md
+
+# Node.js (package.json y package-lock.json SÍ se versionan)
 node_modules/
+
+# Entornos y editores
 .vscode/
+.idea/
+*.swp
+*.bak
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Configuración local de Claude Code
+.claude/settings.local.json

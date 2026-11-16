@@ -3,6 +3,7 @@ import { hasHEnabled, isPlayerEntity } from "./damage_dealt/scoreboard.js";
 import { subscribeOnMobKilledByPlayer } from "./damage_dealt/byplayer/index.js";
 import { combatSkillConfig } from "./config.js";
 import { resolveMobMatch, snapshotEntityForMatch } from "./match.js";
+import { isManagedEquipmentItem } from "./spawns/spawner.js";
 
 let didInit = false;
 /** @type {Map<string, number>} */
@@ -37,6 +38,8 @@ function markHandled(entity) {
 	const id = asStr(entity?.id);
 	if (!id) return;
 	recentlyHandledDeaths.set(id, nowMs());
+	// Hard cap para evitar crecimiento indefinido si cleanupHandledDeaths no se llama
+	if (recentlyHandledDeaths.size > 200) cleanupHandledDeaths();
 }
 
 function wasHandled(entity) {
@@ -51,24 +54,16 @@ function wasHandled(entity) {
 	return true;
 }
 
-function isArmorOrEquipmentItem(itemTypeId) {
-	const id = asStr(itemTypeId).toLowerCase();
-	if (!id) return false;
-	return (
-		id.endsWith("_helmet") ||
-		id.endsWith("_chestplate") ||
-		id.endsWith("_leggings") ||
-		id.endsWith("_boots") ||
-		id.endsWith(":elytra") ||
-		id.endsWith(":shield") ||
-		id.endsWith("_sword") ||
-		id.endsWith("_axe") ||
-		id.endsWith("_pickaxe") ||
-		id.endsWith("_hoe") ||
-		id.endsWith("_trident") ||
-		id.endsWith("_bow") ||
-		id.endsWith("_crossbow")
-	);
+// isArmorOrEquipmentItem delegado a isManagedEquipmentItem de spawner.js
+const isArmorOrEquipmentItem = isManagedEquipmentItem;
+
+function isTrackedCombatMob(entity) {
+	try {
+		return !!entity && hasHEnabled(entity);
+	} catch (e) {
+		void e;
+		return false;
+	}
 }
 
 function safeKillEntity(entity) {
@@ -82,7 +77,7 @@ function safeKillEntity(entity) {
 		void e;
 	}
 	try {
-		entity?.runCommandAsync?.("kill @s");
+		entity?.runCommand?.("kill @s");
 		return true;
 	} catch (e) {
 		void e;
@@ -100,7 +95,6 @@ function rollDropEntry(entry) {
 	const min = Math.max(1, toInt(entry.min, 1));
 	const max = Math.max(min, toInt(entry.max, min));
 	const amount = Math.floor(Math.random() * (max - min + 1)) + min;
-	if (amount <= 0) return null;
 	return { itemId, amount };
 }
 
@@ -159,6 +153,7 @@ function cleanupVanillaDrops(dimension, location, radius, suppressAll, suppressA
 function processLoot(cfg, deadEntity, killer, snapshot) {
 	if (!deadEntity || !snapshot) return;
 	if (asStr(snapshot.typeId) === "minecraft:player") return;
+	if (!isTrackedCombatMob(deadEntity)) return;
 
 	const dimension = deadEntity.dimension;
 	const locationRaw = deadEntity.location;
@@ -174,7 +169,7 @@ function processLoot(cfg, deadEntity, killer, snapshot) {
 	const radius = clamp(Number(cfg?.drops?.radius ?? 4), 1, 8);
 	const defaultSuppress = shouldSuppressVanillaDefault(cfg, killer);
 	const allowVanillaByEntry = match?.allowVanilla === true;
-	const suppressVanilla = !allowVanillaByEntry && defaultSuppress;
+	const suppressVanilla = !!match && !allowVanillaByEntry && defaultSuppress;
 	const alwaysSuppressArmor = cfg?.drops?.alwaysSuppressArmorVanilla !== false;
 	const allowArmorByEntry = match?.allowArmorVanilla === true;
 	const suppressArmorOnly = !suppressVanilla && alwaysSuppressArmor && !allowArmorByEntry;
@@ -187,6 +182,7 @@ function processLoot(cfg, deadEntity, killer, snapshot) {
 
 function handleMobKilledByPlayer(cfg, attacker, target) {
 	if (!target) return;
+	if (!isTrackedCombatMob(target)) return;
 	cleanupHandledDeaths();
 	markHandled(target);
 	const snapshot = snapshotEntityForMatch(target);
@@ -217,6 +213,7 @@ export function initCombatLoot(userConfig = undefined) {
 			try {
 				const deadEntity = ev?.deadEntity;
 				if (!deadEntity || deadEntity.typeId === "minecraft:player") return;
+				if (!isTrackedCombatMob(deadEntity)) return;
 				if (wasHandled(deadEntity)) {
 					markHandled(deadEntity);
 					return;

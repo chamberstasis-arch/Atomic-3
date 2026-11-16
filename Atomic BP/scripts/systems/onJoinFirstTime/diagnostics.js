@@ -33,12 +33,11 @@ function safeBool(value) {
 function summarizeCommandSupport(context) {
 	try {
 		return {
-			hasRunCommandAsync: typeof context?.runCommandAsync === "function",
 			hasRunCommand: typeof context?.runCommand === "function",
 		};
 	} catch (e) {
 		void e;
-		return { hasRunCommandAsync: false, hasRunCommand: false };
+		return { hasRunCommand: false };
 	}
 }
 
@@ -98,7 +97,7 @@ export function runDiagnosticsOnce(player, config) {
 			const dim = player?.dimension ?? getOverworldDimension();
 			const playerCmdSupport = summarizeCommandSupport(player);
 			const dimCmdSupport = summarizeCommandSupport(dim);
-			debugLog(config, `DIAG cmdSupport player(async=${playerCmdSupport.hasRunCommandAsync},sync=${playerCmdSupport.hasRunCommand}) dim(async=${dimCmdSupport.hasRunCommandAsync},sync=${dimCmdSupport.hasRunCommand})`);
+			debugLog(config, `DIAG cmdSupport player(runCommand=${playerCmdSupport.hasRunCommand}) dim(runCommand=${dimCmdSupport.hasRunCommand})`);
 
 			if (!config?.diagnostics?.probeCommands) return;
 

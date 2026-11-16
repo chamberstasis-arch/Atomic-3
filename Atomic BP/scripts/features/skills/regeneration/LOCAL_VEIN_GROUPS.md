@@ -112,7 +112,7 @@ Resultado: comportamiento local, predecible y sin mezclar vetas no relacionadas.
 
 Para evitar colisiones/race y reducir payload por DP:
 
-`scopeKey = atomic3:regen_groups:<dimension>:<area>:<skill>:<family>`
+`scopeKey = atomic:regen_groups:<dimension>:<area>:<skill>:<family>`
 
 No usar una DP global para todos los grupos de todo el mundo.
 

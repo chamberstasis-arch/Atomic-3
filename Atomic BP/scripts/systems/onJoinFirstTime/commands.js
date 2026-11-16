@@ -66,30 +66,15 @@ function statusLooksLikeFailure(statusMessage) {
 }
 
 /**
- * Runs a command using runCommandAsync if present, otherwise runCommand.
- * Returns a normalized result and never throws.
+ * Ejecuta un comando con `runCommand` (síncrono; `runCommandAsync` fue eliminado en Scripting V2).
+ * Devuelve un resultado normalizado y nunca lanza. Se mantiene `async` por compatibilidad con los llamadores.
  */
 export async function runCommandRaw(context, command, config, label = undefined) {
 	const cmd = safeString(command).trim();
 	if (!cmd) return { ok: false, used: "none", command: cmd };
 
 	try {
-		if (context?.runCommandAsync) {
-			const result = await context.runCommandAsync(cmd);
-			const { successCount, statusMessage } = extractCommandResult(result);
-			if (config?.debug && label) {
-				debugLog(config, `${label}: ${cmd} -> successCount=${successCount ?? "?"} status=${safeString(statusMessage)}`);
-			}
-			return {
-				ok: successCount == null ? true : successCount > 0 || !statusLooksLikeFailure(statusMessage),
-				used: "async",
-				command: cmd,
-				successCount,
-				statusMessage,
-			};
-		}
-
-		if (context?.runCommand) {
+		if (typeof context?.runCommand === "function") {
 			const result = context.runCommand(cmd);
 			const { successCount, statusMessage } = extractCommandResult(result);
 			if (config?.debug && label) {

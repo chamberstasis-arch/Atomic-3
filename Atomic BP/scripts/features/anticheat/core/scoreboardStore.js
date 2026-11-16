@@ -28,7 +28,7 @@ export function ensureObjectiveFromConfig(entry, fallbackName, fallbackDisplay) 
 	return null;
 }
 
-// Helpers "get-only": no crean objectives. Úsalos fuera de scoreboardsInit.js.
+// Helpers "get-only": no crean objectives. La creación vive en scripts/scoreboards/init.js.
 export function getObjectiveNameFromConfig(entry, fallbackName) {
 	const e = entry || {};
 	return String(e.scoreboard != null ? e.scoreboard : e.name != null ? e.name : fallbackName).trim() || fallbackName;

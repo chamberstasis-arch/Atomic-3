@@ -253,13 +253,13 @@ export const skillRegenConfig = {
 	// Persistencia (dynamic properties)
 	persistence: {
 		// Key del mundo para guardar pendientes (JSON)
-		key: "atomic3:mining_regen_pending",
+		key: "atomic:mining_regen_pending",
 		// Índice de scopes -> shard key para grupos locales.
-		groupIndexKey: "atomic3:regen_groups_index",
+		groupIndexKey: "atomic:regen_groups_index",
 		// Fallback para scopes no registrados en worldInitialize.
-		groupFallbackKey: "atomic3:regen_groups_fallback",
+		groupFallbackKey: "atomic:regen_groups_fallback",
 		// Prefijo de shards por scope (dp por scope).
-		groupShardPrefix: "atomic3:regen_gs_",
+		groupShardPrefix: "atomic:regen_gs_",
 		// Delay de reintento al fallar restore (ms)
 		retryDelayMs: 2000,
 		// Longitud máxima del string guardado (limita tamaño del JSON).

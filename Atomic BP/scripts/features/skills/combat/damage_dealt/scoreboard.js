@@ -81,7 +81,7 @@ export function killEntityBestEffort(entity) {
 		void e;
 	}
 	try {
-		entity?.runCommandAsync?.("kill @s");
+		entity?.runCommand?.("kill @s");
 		return true;
 	} catch (e) {
 		void e;
@@ -164,7 +164,7 @@ export function debugTellBestEffort(entity, message) {
 		void e;
 	}
 	try {
-		entity?.runCommandAsync?.(`tellraw @s {"rawtext":[{"text":${JSON.stringify(text)}}]}`);
+		entity?.runCommand?.(`tellraw @s {"rawtext":[{"text":${JSON.stringify(text)}}]}`);
 		return true;
 	} catch (e) {
 		void e;

@@ -408,7 +408,7 @@ $$
 4. **Escrituras mínimas**: solo se actualizan scoreboards cuando el valor realmente cambió.
 5. **Rendimiento**: un solo `system.runInterval` central (no uno por jugador ni por entidad). Rate-limit y pooling donde corresponda.
 6. **Robustez defensiva**: todo parsing es best-effort; valores faltantes se tratan como 0. Errores se silencian (`void e`) para no romper el loop.
-7. **API nativa primero**: preferir `world.scoreboard` para leer/escribir scores. Usar `runCommandAsync` solo como fallback.
+7. **API nativa primero**: preferir `world.scoreboard` para leer/escribir scores. Usar `runCommand` (síncrono; `runCommandAsync` ya no existe en Scripting V2) solo como fallback.
 8. **Sin APIs experimentales**: solo Script API estable de `@minecraft/server` 2.4.0.
 9. **Sin dynamic properties**: todo va en scoreboards + cache en memoria volátil (`Map` por player ID).
 10. **IDs ASCII**: todos los nombres de scoreboards y archivos evitan caracteres especiales (ñ, acentos).

@@ -8,11 +8,10 @@ function getObjectiveCached(id) {
 	if (objectiveCache.has(id)) return objectiveCache.get(id) ?? null;
 	try {
 		const obj = world.scoreboard.getObjective(id) ?? null;
-		objectiveCache.set(id, obj);
+		if (obj) objectiveCache.set(id, obj);
 		return obj;
 	} catch (e) {
 		void e;
-		objectiveCache.set(id, null);
 		return null;
 	}
 }

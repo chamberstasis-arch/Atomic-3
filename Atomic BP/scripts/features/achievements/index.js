@@ -111,8 +111,8 @@ function sendTellraw(player, config, achievement, totalValue) {
 		// Prefer API message for reliability
 		player.sendMessage(message);
 		// Best-effort command (if available/allowed)
-		if (typeof player?.runCommandAsync === "function") {
-			player.runCommandAsync(`tellraw ${target} ${json}`).catch(() => {});
+		if (typeof player?.runCommand === "function") {
+			player.runCommand(`tellraw ${target} ${json}`);
 		}
 	} catch (e) {
 		void e;
@@ -130,8 +130,8 @@ function spawnParticles(player, config) {
 			dim.spawnParticle(particle, loc);
 			return;
 		}
-		if (typeof player?.runCommandAsync === "function") {
-			player.runCommandAsync(`particle ${particle} ~~~`);
+		if (typeof player?.runCommand === "function") {
+			player.runCommand(`particle ${particle} ~~~`);
 		}
 	} catch (e) {
 		void e;
@@ -155,8 +155,8 @@ function playSoundPrivate(player, sound, fallback = { minecraftId: "random.level
 			dim.playSound(id, loc, { volume, pitch });
 			return;
 		}
-		if (typeof player?.runCommandAsync === "function") {
-			player.runCommandAsync(`playsound ${id} @s ~~~ ${volume} ${pitch}`);
+		if (typeof player?.runCommand === "function") {
+			player.runCommand(`playsound ${id} @s ~~~ ${volume} ${pitch}`);
 		}
 	} catch (e) {
 		void e;
@@ -180,8 +180,8 @@ function playSoundBroadcast(player, sound, target) {
 			player.playSound(id, { volume, pitch });
 			return;
 		}
-		if (typeof player?.runCommandAsync === "function") {
-			player.runCommandAsync(`playsound ${id} ${target} ~~~ ${volume} ${pitch}`);
+		if (typeof player?.runCommand === "function") {
+			player.runCommand(`playsound ${id} ${target} ~~~ ${volume} ${pitch}`);
 		}
 	} catch (e) {
 		void e;
@@ -199,8 +199,8 @@ function sendMessageBroadcast(player, messageDef) {
 			} else {
 				player.sendMessage(content);
 			}
-			if (typeof player?.runCommandAsync === "function") {
-				player.runCommandAsync(`tellraw ${target} ${JSON.stringify({ rawtext: [{ text: content }] })}`).catch(() => {});
+			if (typeof player?.runCommand === "function") {
+				player.runCommand(`tellraw ${target} ${JSON.stringify({ rawtext: [{ text: content }] })}`);
 			}
 		} catch (e) {
 			void e;

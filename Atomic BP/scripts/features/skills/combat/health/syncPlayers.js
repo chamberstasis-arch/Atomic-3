@@ -128,7 +128,7 @@ function debugTellBestEffort(player, message, world = undefined) {
 		void e;
 	}
 	try {
-		player?.runCommandAsync?.(`tellraw @s {"rawtext":[{"text":${JSON.stringify(String(message))}}]}`);
+		player?.runCommand?.(`tellraw @s {"rawtext":[{"text":${JSON.stringify(String(message))}}]}`);
 	} catch (e) {
 		void e;
 	}
@@ -145,7 +145,7 @@ function clearAbsorptionEffectBestEffort(player) {
 		void e;
 	}
 	try {
-		player?.runCommandAsync?.("effect @s clear absorption");
+		player?.runCommand?.("effect @s clear absorption");
 		return true;
 	} catch (e) {
 		void e;
@@ -353,7 +353,7 @@ function killPlayerBestEffort(player) {
 		void e;
 	}
 	try {
-		player.runCommandAsync?.("kill @s");
+		player.runCommand?.("kill @s");
 		return true;
 	} catch (e) {
 		void e;

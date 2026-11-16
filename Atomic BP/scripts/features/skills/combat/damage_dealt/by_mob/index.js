@@ -68,12 +68,6 @@ function applyMobHitToPlayer(attacker, target, config, source) {
 
 		emitDamageTitle({ attacker, target, danoReal: danoAplicado, isCrit: false });
 
-		try {
-			if (!target?.isValid) killEntityBestEffort(target);
-		} catch (e) {
-			void e;
-		}
-
 		if (config?.debug === true) {
 			debugTellBestEffort(
 				target,
